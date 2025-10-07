@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tkinter-Style Alarm/Calendar App</title>
+    <style>
+        /* --- Tkinter-Style CSS --- */
+        :root {
+            --tk-bg: #ececec; /* Standard Tkinter background grey */
+            --tk-dark-bg: #d9d9d9;
+            --tk-btn-bg: #e0e0e0;
+            --tk-text: #000000;
+            --tk-border: #999999;
+            --tk-active-bg: #c3c3c3;
+            --tk-highlight: #4a6d8c; /* Blue accent for selected/active */
+            --tk-font: 'Arial', sans-serif;
+        }
+
+        body {
+            font-family: var(--tk-font);
+            background-color: var(--tk-dark-bg);
+            padding: 20px;
+            margin: 0;
+            color: var(--tk-text);
+        }
+
+        .tk-frame {
+            background-color: var(--tk-bg);
+            border: 1px solid var(--tk-border);
+            padding: 15px;
+            box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.1);
+            max-width: 900px;
+            margin: 0 auto;
+            display: flex;
+            gap: 15px;
+        }
+
+        .tk-label {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .tk-input, .tk-select {
+            padding: 4px;
+            border: 1px solid var(--tk-border);
+            background-color: white;
+            font-size: 14px;
+            margin-bottom: 10px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .tk-button {
+            padding: 6px 12px;
+            border: 1px solid var(--tk-border);
+            background-color: var(--tk-btn-bg);
+            cursor: pointer;
+            font-size: 14px;
+            text-align: center;
+            line-height: 1;
+            margin: 2px;
+            transition: background-color 0.1s;
+        }
+
+        .tk-button:hover {
+            background-color: var(--tk-active-bg);
+        }
+        
+        .tk-button:active {
+            background-color: var(--tk-highlight);
+            color: white;
+        }
+
+        /* Layout structure */
+        .alarm-settings {
+            flex: 1;
+            min-width: 300px;
+        }
+
+        .right-panel {
+            flex: 1.5;
+            min-width: 400px;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .alarm-list-container {
+            /* Now holds both the list and the library */
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        /* The main alarm list container to control scrolling */
+        #alarm-list-wrapper {
+            height: 250px;
+            overflow-y: auto;
+            border: 1px solid var(--tk-border);
+            background-color: white;
+            margin-bottom: 5px;
+        }
+        
+        .media-library-container {
+            margin-top: 10px; 
+            padding-top: 5px;
+            border-top: 1px solid var(--tk-border);
+            height: 400px;
+            overflow-y: auto;
+        }
+
+        /* Time Presets */
+        #time-presets {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 5px;
+            margin-bottom: 10px;
+            max-height: 150px;
+            overflow-y: auto;
+            border: 1px solid var(--tk-border);
+            padding: 5px;
+            background-color: white;
+        }
+
+        .time-preset-btn {
+            padding: 4px;
+            font-size: 12px;
+        }
+
+        /* Calendar Styling */
+        .calendar {
+            background-color: white;
+            border: 1px solid var(--tk-border);
+            padding: 10px;
+            margin-bottom: 15px;
+        }
+
+        .calendar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 2px;
+            text-align: center;
+        }
+
+        .day-header {
+            font-weight: bold;
+            padding: 5px 0;
+        }
+
+        .day-cell {
+            padding: 5px;
+            cursor: pointer;
+            border: 1px solid transparent;
+            font-size: 12px;
+        }
+
+        .day-cell:not(.empty-day):hover {
+            background-color: var(--tk-active-bg);
+            border: 1px solid var(--tk-border);
+        }
+
+        .day-cell.selected {
+            background-color: var(--tk-highlight);
+            color: white;
+            border-color: var(--tk-highlight);
+        }
+        
+        .day-cell.inactive {
+            color: #aaa;
+        }
+
+        /* Alarm List */
+        .alarm-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px;
+            border-bottom: 1px solid var(--tk-dark-bg);
+            font-size: 14px;
+        }
+
+        .alarm-item:nth-child(even) {
+            background-color: var(--tk-dark-bg);
+        }
+        
+        .alarm-controls .tk-button {
+            margin: 0 2px;
+        }
+        
+        /* Media List */
+        .media-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 5px;
+            margin-bottom: 2px;
+            border: 1px solid var(--tk-border);
+            background-color: white;
+            cursor: pointer;
+        }
+
+        .media-item:hover {
+            background-color: var(--tk-active-bg);
+        }
+
+        .media-item.selected {
+            background-color: var(--tk-highlight);
+            color: white;
+            border-color: var(--tk-highlight);
+        }
+
+        /* Alarm Modal */
+        #alarm-modal {
+            display: none; 
+            position: fixed;
+            z-index: 100;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.7);
+        }
+        
+        .modal-content {
+            background-color: var(--tk-bg);
+            margin: 15% auto;
+            padding: 20px;
+            border: 2px solid var(--tk-highlight);
+            width: 80%;
+            max-width: 500px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            text-align: center;
+        }
+
+        #alarm-media-player {
+            width: 100%;
+            height: 300px;
+            border: none;
+            display: none; /* Controlled by JS */
+            margin-bottom: 10px;
+        }
+
+        #alarm-audio-player {
+            width: 100%;
+            display: none; /* Controlled by JS */
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="tk-frame">
+        <div class="alarm-settings">
+            <div class="tk-label">Set Alarm Time</div>
+            
+            <div id="time-presets">
+                </div>
+            
+            <div class="tk-label">Manual Time Input (H:MM AM/PM)</div>
+            <input type="text" id="manual-time" class="tk-input" placeholder="e.g., 9:30 AM or 12:45 PM" maxlength="8" onkeyup="updateSelectedTimeFromManual()">
+            <div class="tk-label" style="margin-top: 5px;">Selected Time: <span id="selected-time-display">--:--</span></div>
+            
+            <hr style="border: 0; border-top: 1px solid var(--tk-border); margin: 15px 0;">
+
+            <div class="tk-label">Select Date</div>
+            <div class="calendar">
+                <div class="calendar-header">
+                    <button class="tk-button" onclick="changeMonth(-1)">&#9664;</button>
+                    <span id="current-month-year" style="font-weight: bold;"></span>
+                    <button class="tk-button" onclick="changeMonth(1)">&#9654;</button>
+                </div>
+                <div class="calendar-grid" id="calendar-grid">
+                    </div>
+            </div>
+            <div class="tk-label" style="margin-top: 5px;">Selected Date: <span id="selected-date-display">--/--/----</span></div>
+
+            <hr style="border: 0; border-top: 1px solid var(--tk-border); margin: 15px 0;">
+
+            <div class="tk-label">Alarm Sound/Video</div>
+            <select id="alarm-media-select" class="tk-select" onchange="selectPresetMedia(this.value)">
+                <option value="beep">Beep Tone (Default)</option>
+                <option value="chime">Chime Sound</option>
+                <option value="siren">Siren Alert</option>
+                <option value="custom-library">-- Use Custom Media Library --</option>
+            </select>
+            <div class="tk-label" style="margin-top: 5px;">Current Media: <span id="selected-media-display">Beep Tone (Default)</span></div>
+            
+            <div style="margin-top: 15px;">
+                <button class="tk-button" style="width: 100%; font-size: 16px;" onclick="addAlarm()">SET ALARM</button>
+            </div>
+        </div>
+
+        <div class="right-panel">
+            <div class="alarm-list-container">
+                <div class="tk-label">Scheduled Alarms</div>
+                <div id="alarm-list-wrapper">
+                    <div id="alarm-list">
+                        <p style="text-align: center; color: #777; padding: 20px;">No alarms set yet.</p>
+                    </div>
+                </div>
+                <div style="text-align: right;">
+                    <button class="tk-button" onclick="clearAllAlarms()">Clear All Alarms</button>
+                </div>
+
+                <div class="media-library-container">
+                    <div class="tk-label">Custom Media Library (MP3/MP4)</div>
+                    <input type="file" id="media-file-input" accept="audio/*,video/*" multiple class="tk-input" style="margin-bottom: 5px;">
+                    <div id="custom-media-list">
+                        <p style="font-size: 12px; color: #777; text-align: center; padding-top: 10px;">No custom media added.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="alarm-modal">
+        <div class="modal-content">
+            <span class="tk-label" style="font-size: 24px; color: var(--tk-highlight);">TIME'S UP!</span>
+            <p style="font-size: 18px;" id="modal-alarm-info"></p>
+            
+            <iframe id="alarm-media-player" frameborder="0" allowfullscreen></iframe>
+            <audio id="alarm-audio-player" controls loop></audio>
+
+            <button class="tk-button" style="margin-top: 15px;" onclick="stopAlarm()">SNOOZE / STOP</button>
+        </div>
+    </div>
+    
+    <audio id="audio-beep" src="https://www.soundjay.com/button/beep-07.mp3" preload="auto"></audio>
+    <audio id="audio-chime" src="https://www.soundjay.com/misc/chime-bell-5.mp3" preload="auto"></audio>
+    <audio id="audio-siren" src="https://www.soundjay.com/misc/siren-6.mp3" preload="auto"></audio>
+
+
+    <script>
+        // --- JS State and Constants ---
+        const presets = [];
+        for (let h = 0; h < 24; h++) {
+            for (let m = 0; m < 60; m += 30) {
+                const hour = h % 12 === 0 ? 12 : h % 12;
+                const minute = String(m).padStart(2, '0');
+                const ampm = h < 12 ? 'AM' : 'PM';
+                presets.push(`${hour}:${minute} ${ampm}`); // Use single digit hour in presets
+            }
+        }
+        
+        let alarms = [];
+        let customMediaLibrary = [];
+        let selectedMedia = { type: 'audio', name: 'Beep Tone (Default)', source: document.getElementById('audio-beep').src };
+
+        let selectedTime = '7:00 AM'; // Default time
+        let selectedDate = new Date();
+        let currentCalendarDate = new Date();
+        let activeAlarm = null; 
+        let intervalId = null; 
+        
+        const mediaFileInput = document.getElementById('media-file-input'); // Element reference for new listener
+
+        // --- TIME LOGIC (Unchanged) ---
+
+        function updateSelectedTime(time) {
+            // Converts 07:30 to 7:30 if needed, and ensures it's stored correctly
+            let [timePart, ampm] = time.split(' ');
+            let [hour, minute] = timePart.split(':');
+            
+            if (hour.length > 1 && hour.startsWith('0')) {
+                hour = hour.substring(1);
+            }
+            
+            selectedTime = `${hour}:${minute} ${ampm}`;
+            document.getElementById('selected-time-display').textContent = selectedTime;
+            document.getElementById('manual-time').value = selectedTime;
+        }
+
+        function updateSelectedTimeFromManual() {
+            const input = document.getElementById('manual-time').value.trim().toUpperCase();
+            const timeRegex = /^(0?[1-9]|1[0-2]):([0-5][0-9])\s(AM|PM)$/;
+            
+            if (timeRegex.test(input)) {
+                let [timePart, ampm] = input.split(' ');
+                let [hour, minute] = timePart.split(':');
+                if (hour.length > 1 && hour.startsWith('0')) {
+                    hour = hour.substring(1);
+                }
+                
+                selectedTime = `${hour}:${minute} ${ampm}`;
+                document.getElementById('selected-time-display').textContent = selectedTime;
+            } else if (input === "") {
+                 document.getElementById('selected-time-display').textContent = '--:--';
+            } else {
+                 document.getElementById('selected-time-display').textContent = 'Invalid';
+            }
+        }
+        
+        function renderTimePresets() {
+            const container = document.getElementById('time-presets');
+            presets.forEach(time => {
+                const btn = document.createElement('button');
+                btn.className = 'tk-button time-preset-btn';
+                btn.textContent = time;
+                btn.onclick = () => updateSelectedTime(time);
+                container.appendChild(btn);
+            });
+        }
+        
+        // --- CALENDAR LOGIC (Unchanged) ---
+
+        function renderCalendar() {
+            const container = document.getElementById('calendar-grid');
+            const monthYearDisplay = document.getElementById('current-month-year');
+            container.innerHTML = '';
+            
+            const month = currentCalendarDate.getMonth();
+            const year = currentCalendarDate.getFullYear();
+            
+            monthYearDisplay.textContent = new Date(year, month).toLocaleString('en-us', { month: 'long', year: 'numeric' });
+            
+            const firstDayOfMonth = new Date(year, month, 1).getDay();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            
+            const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+            dayNames.forEach(day => {
+                const header = document.createElement('div');
+                header.className = 'day-header';
+                header.textContent = day;
+                container.appendChild(header);
+            });
+
+            for (let i = 0; i < firstDayOfMonth; i++) {
+                const emptyCell = document.createElement('div');
+                emptyCell.className = 'day-cell empty-day inactive';
+                container.appendChild(emptyCell);
+            }
+
+            for (let day = 1; day <= daysInMonth; day++) {
+                const dayCell = document.createElement('div');
+                dayCell.className = 'day-cell';
+                dayCell.textContent = day;
+                
+                const dateToCheck = new Date(year, month, day);
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+
+                if (dateToCheck < today) {
+                    dayCell.classList.add('inactive');
+                } else {
+                    dayCell.onclick = () => selectDate(day, month, year);
+                    
+                    if (selectedDate && day === selectedDate.getDate() && month === selectedDate.getMonth() && year === selectedDate.getFullYear()) {
+                        dayCell.classList.add('selected');
+                    }
+                }
+                
+                container.appendChild(dayCell);
+            }
+        }
+
+        function changeMonth(delta) {
+            currentCalendarDate.setMonth(currentCalendarDate.getMonth() + delta);
+            renderCalendar();
+        }
+
+        function selectDate(day, month, year) {
+            selectedDate = new Date(year, month, day);
+            document.getElementById('selected-date-display').textContent = selectedDate.toLocaleDateString();
+            renderCalendar();
+        }
+        
+        // --- MEDIA LIBRARY LOGIC (MODIFIED) ---
+        
+        // New function to handle file input change
+        function processCustomMedia(event) {
+            const files = event.target.files;
+
+            if (files.length === 0) {
+                return;
+            }
+
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                if (!file.type.startsWith('audio/') && !file.type.startsWith('video/')) {
+                    alert(`Skipping file: ${file.name}. Only audio and video files are supported.`);
+                    continue;
+                }
+                
+                const newMedia = {
+                    id: Date.now() + i, // Simple unique ID
+                    name: file.name,
+                    type: file.type.startsWith('video/') ? 'video' : 'audio',
+                    source: URL.createObjectURL(file) // IMPORTANT: Blob URLs are temporary and lost on page refresh!
+                };
+                customMediaLibrary.push(newMedia);
+            }
+            event.target.value = ''; // Clear the input so the 'change' event fires again if the same file(s) are selected
+            renderMediaLibrary();
+        }
+
+        function removeMedia(id) {
+            const mediaItem = customMediaLibrary.find(m => m.id === id);
+            if (mediaItem) {
+                // Revoke the blob URL to free up memory
+                URL.revokeObjectURL(mediaItem.source); 
+                customMediaLibrary = customMediaLibrary.filter(m => m.id !== id);
+                
+                // If the removed item was currently selected, reset selection
+                if (selectedMedia.id === id) {
+                    selectPresetMedia('beep');
+                    document.getElementById('alarm-media-select').value = 'beep';
+                }
+                renderMediaLibrary();
+            }
+        }
+        
+        function selectPresetMedia(value) {
+            const display = document.getElementById('selected-media-display');
+            const customListItems = document.querySelectorAll('.media-item');
+            
+            customListItems.forEach(item => item.classList.remove('selected'));
+            
+            if (value === 'custom-library') {
+                 display.textContent = 'Select media from library below...';
+                 selectedMedia = null; // Wait for selection from the list
+            } else {
+                let name, source;
+                switch(value) {
+                    case 'chime': name = 'Chime Sound'; source = document.getElementById('audio-chime').src; break;
+                    case 'siren': name = 'Siren Alert'; source = document.getElementById('audio-siren').src; break;
+                    case 'beep':
+                    default: name = 'Beep Tone (Default)'; source = document.getElementById('audio-beep').src; break;
+                }
+                selectedMedia = { type: 'audio', name, source, id: value };
+                display.textContent = name;
+            }
+        }
+
+        function selectCustomMedia(id) {
+            const mediaItem = customMediaLibrary.find(m => m.id === id);
+            if (!mediaItem) return;
+
+            // Update state
+            selectedMedia = mediaItem;
+            document.getElementById('selected-media-display').textContent = mediaItem.name + ` (${mediaItem.type.toUpperCase()})`;
+            document.getElementById('alarm-media-select').value = 'custom-library';
+
+            // Update UI selection
+            document.querySelectorAll('.media-item').forEach(item => {
+                item.classList.remove('selected');
+                if (item.dataset.id == id) {
+                    item.classList.add('selected');
+                }
+            });
+        }
+
+        function renderMediaLibrary() {
+            const container = document.getElementById('custom-media-list');
+            container.innerHTML = '';
+
+            if (customMediaLibrary.length === 0) {
+                container.innerHTML = '<p style="font-size: 12px; color: #777; text-align: center; padding-top: 10px;">No custom media added.</p>';
+                return;
+            }
+
+            customMediaLibrary.forEach(media => {
+                const item = document.createElement('div');
+                item.className = 'media-item' + (selectedMedia && selectedMedia.id === media.id ? ' selected' : '');
+                item.dataset.id = media.id;
+                item.onclick = () => selectCustomMedia(media.id);
+                
+                const typeIcon = media.type === 'video' ? '&#9654;' : '&#9835;'; // Triangle or Musical Note
+                
+                item.innerHTML = `
+                    <span>${typeIcon} ${media.name}</span>
+                    <button class="tk-button" style="padding: 2px 5px;" onclick="event.stopPropagation(); removeMedia(${media.id});">Remove</button>
+                `;
+                container.appendChild(item);
+            });
+        }
+
+        // --- ALARM MANAGEMENT (Unchanged) ---
+
+        function addAlarm() {
+            // 1. Finalize Time
+            const input = document.getElementById('manual-time').value.trim().toUpperCase();
+            // Regex to allow H:MM or HH:MM
+            const timeRegex = /^(0?[1-9]|1[0-2]):([0-5][0-9])\s(AM|PM)$/;
+            
+            if (input && timeRegex.test(input)) {
+                // If manual input is valid, use it and normalize it
+                updateSelectedTime(input);
+            } else if (input !== "" && !timeRegex.test(input)) {
+                // If invalid input is left in the box
+                alert('Invalid time format. Please use H:MM AM/PM (e.g., 9:30 AM).');
+                return;
+            } else if (!selectedTime) {
+                // If no time is selected at all (shouldn't happen with defaults/presets but safe check)
+                alert('Please select a time.');
+                return;
+            }
+
+            if (!selectedDate) {
+                alert('Please select a date.');
+                return;
+            }
+            
+            if (!selectedMedia) {
+                alert('Please select a sound or video for the alarm.');
+                return;
+            }
+
+            // 2. Create Alarm Date Object
+            const [timePart, ampm] = selectedTime.split(' ');
+            let [hourStr, minuteStr] = timePart.split(':');
+            let hour = parseInt(hourStr);
+            let minute = parseInt(minuteStr);
+            
+            if (ampm === 'PM' && hour !== 12) hour += 12;
+            if (ampm === 'AM' && hour === 12) hour = 0; 
+            
+            const alarmDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate(), hour, minute, 0);
+            
+            const now = new Date();
+            if (alarmDate <= now) {
+                alert('The alarm time must be in the future.');
+                return;
+            }
+
+            // 3. Create and Store Alarm
+            const newAlarm = {
+                id: Date.now(),
+                datetime: alarmDate.toISOString(),
+                displayTime: selectedTime,
+                displayDate: selectedDate.toLocaleDateString(),
+                media: selectedMedia
+            };
+            
+            alarms.push(newAlarm);
+            alarms.sort((a, b) => new Date(a.datetime) - new Date(b.datetime));
+            renderAlarmList();
+        }
+
+        function removeAlarm(id) {
+            alarms = alarms.filter(alarm => alarm.id !== id);
+            renderAlarmList();
+        }
+        
+        function clearAllAlarms() {
+             if (confirm('Are you sure you want to delete all scheduled alarms?')) {
+                 alarms = [];
+                 renderAlarmList();
+             }
+        }
+
+        function renderAlarmList() {
+            const container = document.getElementById('alarm-list');
+            container.innerHTML = '';
+
+            if (alarms.length === 0) {
+                container.innerHTML = '<p style="text-align: center; color: #777; padding: 20px;">No alarms set yet.</p>';
+                return;
+            }
+
+            alarms.forEach(alarm => {
+                const item = document.createElement('div');
+                item.className = 'alarm-item';
+                
+                const timeStr = `<strong>${alarm.displayTime}</strong> on ${alarm.displayDate}`;
+                
+                const mediaStr = alarm.media.type === 'video' 
+                    ? ` (Video: ${alarm.media.name})` 
+                    : ` (Audio: ${alarm.media.name})`;
+                
+                item.innerHTML = `
+                    <span>${timeStr}${mediaStr}</span>
+                    <div class="alarm-controls">
+                        <button class="tk-button" onclick="removeAlarm(${alarm.id})">Delete</button>
+                    </div>
+                `;
+                container.appendChild(item);
+            });
+        }
+        
+        // --- ALARM CHECKER AND RINGING (Unchanged) ---
+        function checkAlarms() {
+            const now = new Date();
+            
+            if (alarms.length > 0) {
+                const nextAlarm = alarms[0];
+                const alarmTime = new Date(nextAlarm.datetime);
+                
+                if (alarmTime <= now) {
+                    ringAlarm(nextAlarm);
+                    removeAlarm(nextAlarm.id);
+                }
+            }
+        }
+        
+        function ringAlarm(alarm) {
+            activeAlarm = alarm;
+            const modal = document.getElementById('alarm-modal');
+            const info = document.getElementById('modal-alarm-info');
+            const audioPlayer = document.getElementById('alarm-audio-player');
+            const videoPlayer = document.getElementById('alarm-media-player');
+
+            info.textContent = `${alarm.displayTime} on ${alarm.displayDate} - Playing: ${alarm.media.name}`;
+            
+            audioPlayer.style.display = 'none';
+            videoPlayer.style.display = 'none';
+
+            if (alarm.media.type === 'video') {
+                videoPlayer.src = alarm.media.source;
+                videoPlayer.style.display = 'block';
+            } else {
+                audioPlayer.src = alarm.media.source;
+                audioPlayer.loop = true;
+                audioPlayer.style.display = 'block';
+                audioPlayer.play().catch(e => console.error("Audio playback failed (Requires user interaction):", e));
+            }
+
+            modal.style.display = 'block';
+        }
+        
+        function stopAlarm() {
+            const modal = document.getElementById('alarm-modal');
+            const audioPlayer = document.getElementById('alarm-audio-player');
+            const videoPlayer = document.getElementById('alarm-media-player');
+
+            audioPlayer.pause();
+            audioPlayer.currentTime = 0;
+            videoPlayer.src = ''; 
+            
+            modal.style.display = 'none';
+            activeAlarm = null;
+        }
+
+        function startAlarmChecker() {
+             if (intervalId) clearInterval(intervalId);
+             intervalId = setInterval(checkAlarms, 1000); 
+        }
+        
+        // --- Initialization ---
+        
+        // Add event listener to media file input for automatic library update
+        mediaFileInput.addEventListener('change', processCustomMedia);
+
+        // Initialize calendar, time, and alarm checker
+        updateSelectedTime(selectedTime);
+        selectDate(currentCalendarDate.getDate(), currentCalendarDate.getMonth(), currentCalendarDate.getFullYear());
+        renderTimePresets();
+        renderAlarmList();
+        renderMediaLibrary();
+        startAlarmChecker();
+    </script>
+</body>
+</html>

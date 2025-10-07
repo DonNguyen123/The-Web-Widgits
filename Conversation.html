@@ -1,0 +1,2060 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RPG Conversation Simulation</title>
+    <style>
+        /* All layout and styling must be here now, no external files. */
+        
+        /* Layout resets */
+        body {
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+        }
+
+        /* Custom CSS for the Tkinter/Old Windows GUI aesthetic */
+        .tkinter-bg {
+            background-color: #d9d9d9; 
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+        
+        .tkinter-widget-border {
+            /* Mock 3D effect using box-shadow for a "raised" look */
+            border: 1px solid #808080; 
+            box-shadow: 1px 1px 0px #ffffff, -1px -1px 0px #ffffff, 2px 2px 0px #000000;
+            border-radius: 0; 
+        }
+
+        .tkinter-text-area {
+            font-family: monospace, 'Courier New', Courier, sans-serif;
+            resize: none;
+            border-radius: 0;
+            background-color: white;
+            padding: 4px; 
+            width: 100%;
+            box-sizing: border-box;
+            border: 1px solid #ccc; /* Basic border for inputs/textareas */
+        }
+        
+        /* Ensure the conversation text area is properly contained and scrollable */
+        #conversation-text-area {
+            flex-grow: 1; /* Takes up all available vertical space */
+            overflow-y: auto; /* Allows scrolling */
+        }
+        
+        /* Ensure the inner <p> starts exactly at the top and fills the container */
+        #conversation-text {
+            min-height: 100%; 
+            margin: 0; 
+        }
+
+
+        .tkinter-button {
+            background-color: #e1e1e1;
+            transition: none;
+            cursor: pointer;
+            user-select: none;
+            padding: 8px 16px; 
+            border: 1px solid #808080;
+            box-shadow: 1px 1px 0px #ffffff, -1px -1px 0px #ffffff, 2px 2px 0px #000000;
+            border-radius: 0;
+            text-align: center;
+            white-space: nowrap;
+        }
+        
+        /* Ensure buttons fill width when needed */
+        .tkinter-button.full-width {
+            width: 100%;
+        }
+
+        .tkinter-button:active {
+            /* Invert the shadow on click for a "pressed" look */
+            box-shadow: 1px 1px 0px #000000, -1px -1px 0px #000000, 0px 0px 0px #ffffff;
+            transform: translateY(1px); 
+        }
+        
+        /* Style for the active speaker highlight */
+        .active-border {
+            transition: border 0.3s ease;
+            border: 5px solid;
+            box-shadow: 0 0 10px rgba(255, 255, 0, 0.7); 
+        }
+
+        /* Images must be constrained to parent box before object-fit applies */
+        .object-contain {
+            object-fit: contain;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Container for the image to maintain a square aspect ratio */
+        .image-container {
+            width: 6rem; /* 96px */
+            height: 6rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid #808080;
+        }
+        /* UPDATED: Increased Image Size */
+        .image-container-lg {
+            width: 12rem; /* 192px */
+            height: 12rem; 
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid #808080;
+        }
+
+        /* Styling for the native color input */
+        .tkinter-color-picker {
+            padding: 0;
+            border: 1px solid #808080;
+            background-color: transparent;
+            width: 2.5rem; 
+            height: 2.25rem; 
+            cursor: pointer;
+            box-shadow: none !important; 
+        }
+        .tkinter-color-picker::-webkit-color-swatch-wrapper { padding: 0; }
+        .tkinter-color-picker::-webkit-color-swatch { border: none; }
+
+        /* --- Custom Layout for Replacing Tailwind --- */
+        #app-container {
+            width: 100%;
+            max-width: 1024px; 
+            padding: 16px; 
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        
+        /* Shift section titles slightly to the right */
+        #setup-panel h2 {
+            margin-left: 8px;
+        }
+
+        /* Setup Panel Sections */
+        #setup-panel > div {
+            padding: 16px; 
+            margin-bottom: 16px; 
+        }
+
+        /* Flex utilities replacement */
+        .flex-container {
+            display: flex;
+            align-items: flex-end; 
+            gap: 12px; 
+        }
+        
+        .flex-item {
+            flex: 1 1 0%; 
+        }
+        
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 16px; 
+            padding: 12px; 
+            height: 24rem; 
+            overflow-y: auto;
+        }
+        
+        /* Simulation Layout */
+        #simulation-layout-container {
+            display: flex;
+            gap: 16px;
+            align-items: flex-start; 
+            height: 100%; 
+        }
+        #simulation-layout-container > div {
+            box-sizing: border-box;
+        }
+
+        #left-speaker-column, #right-speaker-column {
+            width: 25%; 
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            flex-shrink: 0;
+        }
+
+        #dialogue-box-column {
+            width: 50%; /* Default width for multi-speaker */
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            /* UPDATED: Reduced Dialogue Box Height */
+            height: 14rem; 
+        }
+        
+        /* Dynamic width for single speaker mode */
+        #dialogue-box-column.dialogue-expanded {
+             width: 75%; 
+        }
+        
+        /* UPDATED: Reduced Simulation Panel Height */
+        #simulation-panel {
+            /* Set a fixed max-width and defined height for accurate canvas capture */
+            max-width: 100%; 
+            height: 16rem; /* Reduced height */
+            display: none; /* Hide when not in use */
+            overflow: hidden; /* Ensure nothing spills out of the capture area */
+        }
+        #simulation-panel.active {
+            display: block; /* Show when active */
+        }
+
+
+        /* Utility classes re-definition (Only necessary ones) */
+        .text-xs { font-size: 0.75rem; }
+        .text-sm { font-size: 0.875rem; }
+        .text-base { font-size: 1rem; }
+        .text-lg { font-size: 1.125rem; }
+        .text-xl { font-size: 1.25rem; }
+        .font-bold { font-weight: 700; }
+        .font-semibold { font-weight: 600; }
+        .mb-1 { margin-bottom: 4px; }
+        .mb-2 { margin-bottom: 8px; }
+        .mb-3 { margin-bottom: 12px; }
+        .mb-4 { margin-bottom: 16px; }
+        .mt-1 { margin-top: 4px; }
+        .mt-2 { margin-top: 8px; }
+        .mt-3 { margin-top: 12px; }
+        .mt-4 { margin-top: 16px; }
+        .pt-2 { padding-top: 8px; }
+        .pb-3 { padding-bottom: 12px; }
+        .border-b { border-bottom: 1px solid #e5e7eb; }
+        .border-t { border-top: 1px solid #e5e7eb; }
+        .hidden { display: none !important; }
+        .bg-white { background-color: white; }
+        .bg-gray-100 { background-color: #f3f4f6; }
+        .bg-gray-200 { background-color: #e5e7eb; }
+        .text-center { text-align: center; }
+        .justify-between { justify-content: space-between; }
+        .flex-col { flex-direction: column; }
+        .items-center { align-items: center; }
+        .whitespace-pre-wrap { white-space: pre-wrap; }
+        .text-green-700 { color: #047857; }
+        .text-red-500 { color: #ef4444; }
+        .text-gray-500 { color: #6b7280; }
+        .text-gray-600 { color: #4b5563; }
+        .text-red-600 { color: #dc2626; }
+        .bg-red-600 { background-color: #dc2626; }
+        .bg-blue-600 { background-color: #2563eb; }
+        .bg-green-500 { background-color: #10b981; }
+        .bg-gray-400 { background-color: #9ca3af; }
+        .text-white { color: white; }
+        .disabled\:opacity-50:disabled { opacity: 0.5; }
+        .cursor-pointer { cursor: pointer; }
+        .w-full { width: 100%; }
+        .h-full { height: 100%; }
+        .border { border: 1px solid #d1d5db; }
+        .p-2 { padding: 8px; }
+        .p-3 { padding: 12px; }
+        .p-4 { padding: 16px; }
+        .px-3 { padding-left: 12px; padding-right: 12px; }
+        .py-1 { padding-top: 4px; padding-bottom: 4px; }
+    </style>
+</head>
+<body class="tkinter-bg">
+    
+    <div id="app-container" class="tkinter-bg tkinter-widget-border">
+        <h1 class="text-xl font-bold mb-4">RPG Conversation Simulation</h1>
+
+        <div id="setup-panel" class="tkinter-widget-border bg-white">
+            
+            <h2 class="text-lg font-semibold mb-3">1. Import Profiles & Media</h2>
+            
+            <div class="p-4 border mb-4">
+                <label class="block text-sm font-medium mb-1">Select Portrait Image(s) and/or Audio/Video File(s)</label>
+                <input type="file" id="new-char-image" accept="image/*, audio/*, video/mp4" class="w-full text-sm mb-3" multiple onchange="addCharacterProfile()">
+                <p class="text-xs text-gray-600">
+                    Images will load as portraits. Audio (.mp3) or video (.mp4) files will be available for sound scripting.<br>
+                    Files are named using their filenames (e.g., Bob.png -> Bob, Speech.mp3 -> Speech).
+                </p>
+            </div>
+
+            <h2 class="text-lg font-semibold mt-6 mb-3">2. Defined Profiles</h2>
+            <div id="character-list" class="grid-container">
+                <p class="text-gray-500 text-sm" style="grid-column: span 3;">No profiles defined yet. Use the creator above.</p>
+            </div>
+            
+            <h2 class="text-lg font-semibold mt-6 mb-3">3. Active Roster</h2>
+            
+            <div id="roster-control-panel" class="p-3 border mb-4">
+                <h4 class="font-bold text-base mb-2">Configure New Roster Member</h4>
+                <div class="flex-container">
+                    
+                    <div class="flex-item">
+                        <label class="block text-sm font-medium mb-1">Assigned Portrait</label>
+                        <div id="new-roster-image-container" class="image-container tkinter-widget-border bg-gray-200">
+                             <img id="new-roster-image-preview" class="w-full h-full object-contain" alt="Selected Portrait">
+                        </div>
+                        <p id="new-roster-profile-name" class="text-xs text-center mt-1">Select below</p>
+                    </div>
+
+                    <div class="flex-item">
+                        <label class="block text-sm font-medium mb-1">Script Name (Must match script!)</label>
+                        <input type="text" id="new-roster-script-name" placeholder="e.g., Bob" class="tkinter-text-area">
+                    </div>
+
+                    <div class="flex-item">
+                        <label class="block text-sm font-medium mb-1">Dialogue Color</label>
+                        <div class="flex-container" style="align-items: center; gap: 8px;">
+                            <input type="text" id="new-roster-color" value="#1d4ed8" 
+                                class="tkinter-text-area text-sm">
+                            <input type="color" id="new-roster-color-picker" value="#1d4ed8" 
+                                oninput="document.getElementById('new-roster-color').value = this.value.toUpperCase()"
+                                class="tkinter-color-picker">
+                        </div>
+                    </div>
+                    
+                    <button onclick="addToRoster()" class="tkinter-button text-sm" style="min-width: 100px;">
+                        Add to Roster
+                    </button>
+                </div>
+            </div>
+
+            <div id="active-roster-list" class="border" style="padding: 12px;">
+                <p class="text-gray-500 text-sm">Roster is empty. Click on a portrait above to assign it to a script name and color.</p>
+            </div>
+
+            <h2 class="text-lg font-semibold mt-6 mb-3">4. Script & Timing</h2>
+            <div class="p-3 border">
+                
+                <div class="flex-container mb-3 border-b pb-3" style="align-items: center;">
+                    <input type="checkbox" id="equal-time-checkbox" style="height: 16px; width: 16px;">
+                    <label for="equal-time-checkbox" class="text-sm font-medium flex-item">
+                        Use **Equal Time Delay** for ALL turns (Overrides script timing)
+                    </label>
+                    <input type="number" id="equal-time-input" value="3" min="0.5" step="0.5" 
+                           class="tkinter-text-area text-sm" style="width: 80px; text-align: center;">
+                    <span class="text-sm" style="min-width: 50px;">seconds</span>
+                </div>
+                
+                <div class="flex-container mb-3 pb-3 border-b" style="align-items: center;">
+                    <input type="checkbox" id="single-line-checkbox" style="height: 16px; width: 16px;" checked>
+                    <label for="single-line-checkbox" class="text-sm font-medium flex-item">
+                        **Clear previous dialogue** (Show only current line)
+                    </label>
+                </div>
+                
+                <div id="script-upload-view">
+                    <label class="block text-sm font-medium mb-1">Upload Script (.txt)</label>
+                    <input type="file" id="text-upload" accept=".txt,.text" class="w-full text-sm mb-3" onchange="handleFileUpload()">
+                    <p id="uploaded-file-name" class="text-sm text-green-700 mb-2 hidden">No script loaded.</p>
+
+                    <div class="flex-container" style="gap: 8px;">
+                        <button onclick="toggleScriptEditor('new')" class="tkinter-button text-sm flex-item">
+                            + Create New Script
+                        </button>
+                        <button id="edit-uploaded-button" onclick="toggleScriptEditor('edit')" class="tkinter-button text-sm flex-item disabled:opacity-50" disabled>
+                            Edit Script
+                        </button>
+                    </div>
+                </div>
+
+                <div id="script-editor-view" class="hidden">
+                    <label class="block text-sm font-medium mb-1">Script Content (New Bracketed Format)</label>
+                    <textarea id="script-editor-textarea" rows="10" placeholder="New Format: [LeftSpeaker: Dialogue] [Optional MediaFile] [Optional TimeRange] [Optional Delay] [Optional RightSpeakerName]&#10;e.g.,&#10;[Tomorrow: Hello.][Speech.mp3][1:30-10:15][Among the Stars]  <- Full line with media&#10;&#10;[General Zyro: Its you.][3]  <- Single-speaker line with delay&#10;&#10;[Hero: Who are you talking to?][Unknown]  <- Special 'Unknown' on the right" 
+                        class="tkinter-text-area mb-3 p-2"></textarea>
+                    
+                    <div class="flex-container" style="justify-content: space-between; gap: 8px; align-items: stretch;">
+                        <button onclick="saveScript()" class="tkinter-button text-sm flex-item" style="background-color: #10b981; color: white;">
+                            Save & Use Script
+                        </button>
+                        <button onclick="cancelEdit()" class="tkinter-button text-sm" style="background-color: #9ca3af;">
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+
+                <p class="text-xs text-gray-600 mt-3 border-t pt-2">
+                    <span class="font-bold">New Format:</span> `[LeftSpeaker: Dialogue] [MediaFile] [Start:End] [Delay] [RightSpeakerName]`<br>
+                    - All tags after `[Speaker: Dialogue]` are optional and can be in any order, except `[RightSpeakerName]` must be last if present.<br> 
+                    - Note that HTML download is expirimental feature and may use a lot of storage and memory. Only works on manual clicking, does not support sound or script timing.
+                </p>
+            </div>
+
+            <div id="download-button-container" class="mt-4 p-2 text-center" style="width:100%; border: 1px solid #e5e7eb; padding: 8px;">
+                <button id="download-html-button" onclick="generateDownloadableHtml()" class="tkinter-button text-sm" style="background-color: #2563eb; color: white;">
+                    Download Standalone Simulation HTML
+                </button>
+            </div>
+
+            <button id="start-button" onclick="startConversation()" class="tkinter-button mt-4 full-width text-lg">Start Simulation</button>
+        </div>
+
+        <div id="simulation-panel" class="mt-4 p-4 tkinter-widget-border bg-white">
+            <div id="simulation-layout-container">
+                
+                <div id="left-speaker-column">
+                    <div class="image-container-lg tkinter-widget-border mb-2">
+                         <img id="left-speaker-image" class="object-contain" style="border: 2px solid #808080;" alt="Left Speaker">
+                    </div>
+                    <p id="left-speaker-name-display" class="font-bold mt-2 text-center text-black"></p>
+                </div>
+
+                <div id="dialogue-box-column">
+                    <audio id="audio-player" class="hidden"></audio>
+
+                    <div id="conversation-text-area" class="p-2 tkinter-widget-border bg-white cursor-pointer" onclick="nextTurn()">
+                        <p id="conversation-text" class="tkinter-text-area whitespace-pre-wrap text-base h-full"></p>
+                    </div>
+                </div>
+
+                <div id="right-speaker-column">
+                    <div class="image-container-lg tkinter-widget-border mb-2">
+                        <img id="right-speaker-image" class="object-contain" style="border: 2px solid #808080;" alt="Right Speaker">
+                    </div>
+                    <p id="right-speaker-name-display" class="font-bold mt-2 text-center text-black"></p>
+                </div>
+
+            </div>
+            
+        </div>
+    </div>
+
+    <script>
+        
+        // --- Base64 Placeholders to eliminate external image requests ---
+        // 16x16 Light Gray (#DDDDDD)
+        const BASE64_GRAY_PLACEHOLDER = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAHklEQVR42mNgoBr4j4oYmQEKMBYwE4gI0YJ/CgYADa8E7oO1CbgAAAAASUVORK5CYII=';
+        // 16x16 Solid Black (#000000)
+        const BASE64_BLACK_PLACEHOLDER = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAADFJREFUOE9jZMAEQjB/w/2P7D8cW4wTzBj0oR5wUzAo4FSAh4YwS0BfIAEAm6EE7B/f8O8AAAAASUVORK5CYII=';
+        
+        const state = {
+            conversationTurns: [],
+            currentTurnIndex: -1,
+            // Stores { id, displayName, imageURL (Base64), fileType, isImage } from uploads
+            characterProfiles: [], 
+            // Maps ScriptName (lowercase) to { color, imageURL, profileId, displayName, scriptName (original case) }
+            activeRoster: {}, 
+            selectedProfileId: null, // Used for selecting a profile to add to the roster
+            
+            rawScriptContent: null, // Stores the original script text, whether custom or uploaded
+            uploadedFile: null,
+            
+            // TIMING & DISPLAY STATE
+            useEqualDelay: false,
+            equalDelaySeconds: 3, 
+            singleLineMode: true, 
+            currentTimeout: null, 
+            
+            // State for locking character positions during a scene
+            currentSceneCharacters: {
+                leftKey: null,
+                rightKey: null,
+            },
+
+            // AUDIO STATE
+            currentAudio: null,
+            audioStopTimeout: null,
+            isAudioPlaying: false,
+            
+            // Download State
+            downloadTitle: "Conversation Simulation",
+        };
+        
+        let characterIdCounter = 0; 
+
+        const elements = {
+            appContainer: document.getElementById('app-container'),
+            setupPanel: document.getElementById('setup-panel'),
+            simulationPanel: document.getElementById('simulation-panel'),
+            simulationLayoutContainer: document.getElementById('simulation-layout-container'),
+            dialogueBoxColumn: document.getElementById('dialogue-box-column'),
+            leftSpeakerColumn: document.getElementById('left-speaker-column'),
+            rightSpeakerColumn: document.getElementById('right-speaker-column'),
+            
+            leftImage: document.getElementById('left-speaker-image'),
+            rightImage: document.getElementById('right-speaker-image'),
+            leftNameDisplay: document.getElementById('left-speaker-name-display'),
+            rightNameDisplay: document.getElementById('right-speaker-name-display'),
+            conversationText: document.getElementById('conversation-text'),
+            conversationTextArea: document.getElementById('conversation-text-area'),
+            audioPlayer: document.getElementById('audio-player'), 
+            
+            // Setup inputs
+            newCharImage: document.getElementById('new-char-image'),
+            characterList: document.getElementById('character-list'),
+            
+            // Roster Configuration
+            activeRosterList: document.getElementById('active-roster-list'),
+            newRosterImagePreview: document.getElementById('new-roster-image-preview'),
+            newRosterProfileName: document.getElementById('new-roster-profile-name'),
+            newRosterScriptName: document.getElementById('new-roster-script-name'),
+            newRosterColor: document.getElementById('new-roster-color'),
+
+            // Script Editor Elements
+            textUpload: document.getElementById('text-upload'),
+            scriptUploadView: document.getElementById('script-upload-view'),
+            scriptEditorView: document.getElementById('script-editor-view'),
+            scriptEditorTextarea: document.getElementById('script-editor-textarea'),
+            uploadedFileName: document.getElementById('uploaded-file-name'),
+            editUploadedButton: document.getElementById('edit-uploaded-button'),
+
+            // Timing & Display Elements
+            equalTimeCheckbox: document.getElementById('equal-time-checkbox'),
+            equalTimeInput: document.getElementById('equal-time-input'),
+            singleLineCheckbox: document.getElementById('single-line-checkbox'), 
+            
+            // End Status Elements
+            downloadHtmlButton: document.getElementById('download-html-button'),
+        };
+        
+        // Initialize the new Roster Preview with the Base64 placeholder
+        elements.newRosterImagePreview.src = BASE64_GRAY_PLACEHOLDER;
+        
+        // --- Utility Functions ---
+
+        function showMessageBox(title, message) {
+            const messageBox = document.createElement('div');
+            messageBox.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50';
+            messageBox.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 50;';
+            messageBox.innerHTML = `
+                <div class="tkinter-bg tkinter-widget-border p-4" style="width: 100%; max-width: 384px; padding: 16px;">
+                    <h4 class="font-bold text-lg mb-2" style="font-size: 1.125rem; font-weight: 700; margin-bottom: 8px;">${title}</h4>
+                    <p class="mb-4" style="margin-bottom: 16px;">${message}</p>
+                    <button class="tkinter-button" onclick="this.parentElement.parentElement.remove()" style="float: right; padding: 4px 12px; font-size: 0.875rem;">OK</button>
+                </div>
+            `;
+            document.body.appendChild(messageBox);
+        }
+
+        // Utility to convert mm:ss to seconds
+        function timeToSeconds(timeStr) {
+            if (!timeStr) return 0;
+            const parts = timeStr.split(':');
+            if (parts.length === 2) {
+                return parseInt(parts[0], 10) * 60 + parseFloat(parts[1]);
+            }
+            return 0;
+        }
+
+        function getProfile(id) {
+            return state.characterProfiles.find(p => p.id === id);
+        }
+
+        function getProfileByName(name) {
+            // Find a profile whose displayName matches the name provided (case-insensitive)
+            return state.characterProfiles.find(p => p.displayName.toLowerCase() === name.toLowerCase());
+        }
+        
+        /**
+         * Converts a File object to a Base64 Data URL.
+         */
+        function fileToDataURL(file) {
+            return new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(reader.result);
+                reader.onerror = () => {
+                     console.error("Error converting file to Data URL:", file.name);
+                     resolve(BASE64_GRAY_PLACEHOLDER); // Return placeholder on failure
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        /**
+         * Triggers a file download in the browser.
+         */
+        function downloadFile(filename, data, mimeType) {
+            const blob = new Blob([data], { type: mimeType });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+
+        async function addCharacterProfile() {
+            const files = elements.newCharImage.files;
+            if (files.length === 0) return;
+
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                const filename = file.name.replace(/\.[^/.]+$/, ""); 
+                const fileType = file.type.split('/')[0];
+                const isImage = fileType === 'image';
+                
+                // CRITICAL FIX: Convert to Base64 Data URL immediately on upload.
+                const dataURL = await fileToDataURL(file);
+
+                const profile = {
+                    id: characterIdCounter++,
+                    displayName: filename,
+                    // Use the Data URL directly for both image and media storage
+                    imageURL: isImage ? dataURL : BASE64_GRAY_PLACEHOLDER, 
+                    fileURL: dataURL, 
+                    fileType: fileType,
+                    isImage: isImage
+                };
+                
+                // Prevent duplicate display names (case-insensitive)
+                if (state.characterProfiles.some(p => p.displayName.toLowerCase() === filename.toLowerCase())) {
+                     showMessageBox('Warning', `A profile named "${filename}" already exists. Skipping file.`);
+                     continue;
+                }
+                
+                state.characterProfiles.push(profile);
+            }
+
+            elements.newCharImage.value = ''; 
+            renderCharacterList();
+        }
+
+        function removeCharacter(profileId) {
+            const profileIndex = state.characterProfiles.findIndex(p => p.id === profileId);
+            if (profileIndex === -1) return;
+
+            // Remove from Roster if present
+            for (const scriptName in state.activeRoster) {
+                if (state.activeRoster[scriptName].profileId === profileId) {
+                    delete state.activeRoster[scriptName];
+                }
+            }
+            
+            state.characterProfiles.splice(profileIndex, 1);
+
+            renderRoster();
+            renderCharacterList();
+        }
+
+        function selectProfileForRoster(profileId) {
+            const profile = getProfile(profileId);
+            if (!profile || !profile.isImage) {
+                showMessageBox('Error', 'Only image files can be selected as a portrait.');
+                return;
+            }
+            
+            // Clear any previous selection highlight
+            document.querySelectorAll('.profile-card').forEach(el => el.style.outline = 'none');
+            const selectedCard = document.getElementById(`profile-card-${profileId}`);
+            if (selectedCard) {
+                 selectedCard.style.outline = '4px dashed #10b981'; // Outline-4 outline-dashed outline-green-500
+            }
+
+            state.selectedProfileId = profileId;
+            elements.newRosterImagePreview.src = profile.imageURL;
+            elements.newRosterProfileName.textContent = profile.displayName;
+            elements.newRosterScriptName.value = profile.displayName; // Pre-fill script name
+        }
+
+        function addToRoster() {
+            if (state.selectedProfileId === null) {
+                showMessageBox('Error', 'Please click an image portrait in Section 2 to select it first.');
+                return;
+            }
+
+            const scriptName = elements.newRosterScriptName.value.trim();
+            const color = elements.newRosterColor.value.trim();
+            const profile = getProfile(state.selectedProfileId);
+            
+            if (!profile.isImage) {
+                // This shouldn't happen if selectProfileForRoster is used correctly, but as a safeguard:
+                showMessageBox('Error', 'The selected file is not an image and cannot be added to the roster.');
+                return;
+            }
+
+            if (!scriptName) {
+                showMessageBox('Error', 'Script Name cannot be empty.');
+                return;
+            }
+            
+            const key = scriptName.toLowerCase();
+
+            // Check if this scriptName is already used by a *different* profile
+            if (state.activeRoster[key] && state.activeRoster[key].profileId !== state.selectedProfileId) {
+                showMessageBox('Error', `The script name "${scriptName}" is already used by another character. Please choose a unique name.`);
+                return;
+            }
+            
+            // Remove previous association if the selected profile was previously assigned a different script name
+            for (const name in state.activeRoster) {
+                if (state.activeRoster[name].profileId === state.selectedProfileId && name !== key) {
+                    delete state.activeRoster[name];
+                }
+            }
+
+            state.activeRoster[key] = {
+                profileId: state.selectedProfileId,
+                color: color,
+                imageURL: profile.imageURL,
+                fileURL: profile.fileURL, // Include fileURL for saving in downloadable HTML
+                displayName: profile.displayName,
+                scriptName: scriptName 
+            };
+            
+            state.selectedProfileId = null;
+            elements.newRosterImagePreview.src = BASE64_GRAY_PLACEHOLDER; 
+            elements.newRosterProfileName.textContent = 'Select below';
+            elements.newRosterScriptName.value = '';
+            
+            document.querySelectorAll('.profile-card').forEach(el => el.style.outline = 'none');
+            
+            renderRoster();
+        }
+        
+        function removeFromRoster(scriptName) {
+            delete state.activeRoster[scriptName.toLowerCase()];
+            renderRoster();
+        }
+
+        function renderRoster() {
+            const rosterList = elements.activeRosterList;
+            const rosterKeys = Object.keys(state.activeRoster);
+
+            if (rosterKeys.length === 0) {
+                rosterList.innerHTML = '<p class="text-gray-500 text-sm">Roster is empty. Click on a portrait above to assign it to a script name and color.</p>';
+                return;
+            }
+
+            rosterList.innerHTML = rosterKeys.map(key => {
+                const item = state.activeRoster[key];
+                return `
+                    <div class="flex-container mb-2" style="padding: 8px; border: 1px solid #d1d5db; background-color: #f3f4f6; align-items: center;">
+                        <div class="flex-container" style="gap: 12px; align-items: center; flex-grow: 1;">
+                            <div class="image-container" style="width: 40px; height: 40px; border-color: ${item.color}; border-width: 3px;">
+                                <img src="${item.imageURL}" class="object-contain" style="width: 100%; height: 100%;" alt="${item.displayName}">
+                            </div>
+                            <div>
+                                <p class="font-bold text-sm">${item.displayName} (Script Name: ${item.scriptName})</p>
+                                <p class="text-xs">Color: <span style="color: ${item.color}; font-weight: bold;">${item.color}</span></p>
+                            </div>
+                        </div>
+                        <button onclick="removeFromRoster('${key}')" class="tkinter-button text-xs" style="padding: 4px 12px; background-color: #dc2626; color: white;">
+                            Remove
+                        </button>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        function renderCharacterList() {
+            const listContainer = elements.characterList;
+            
+            if (state.characterProfiles.length === 0) {
+                listContainer.innerHTML = '<p class="text-gray-500 text-sm" style="grid-column: span 3;">No profiles defined yet. Use the creator above.</p>';
+                return;
+            }
+
+            listContainer.innerHTML = state.characterProfiles.map(profile => {
+                let rosterStatus = '';
+                let rosterColor = '#808080';
+                let rosterKey = null;
+                
+                for (const key in state.activeRoster) {
+                    if (state.activeRoster[key].profileId === profile.id) {
+                        rosterStatus = `In Roster: ${state.activeRoster[key].scriptName}`; 
+                        rosterColor = state.activeRoster[key].color;
+                        rosterKey = key;
+                        break;
+                    }
+                }
+                
+                const isSelected = state.selectedProfileId === profile.id;
+                const clickAction = profile.isImage ? `onclick="selectProfileForRoster(${profile.id})"` : '';
+                const baseClass = profile.isImage ? 'cursor-pointer' : 'cursor-default';
+                const removeAction = rosterKey ? `onclick="event.stopPropagation(); removeFromRoster('${rosterKey}'); removeCharacter(${profile.id})"` : `onclick="event.stopPropagation(); removeCharacter(${profile.id})"`;
+
+                return `
+                    <div id="profile-card-${profile.id}" 
+                         class="profile-card relative p-1 border bg-gray-100 tkinter-widget-border flex-col items-center" 
+                         style="display: flex; padding: 4px; background-color: #f3f4f6; ${baseClass}; ${isSelected ? 'outline: 4px dashed #10b981;' : ''}"
+                         ${clickAction}>
+                        
+                        <div class="image-container tkinter-widget-border" style="border: 3px solid ${rosterColor};">
+                            <img src="${profile.imageURL}" class="object-contain" style="width: 100%; height: 100%;" alt="${profile.displayName}">
+                        </div>
+                        
+                        <div class="mt-2 text-center" style="margin-top: 8px; width: 100%;">
+                            <p class="font-bold text-xs" style="font-weight: 700; font-size: 0.75rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${profile.displayName}">${profile.displayName}</p>
+                            <p class="text-xs mb-1" style="font-size: 0.75rem; margin-bottom: 4px; color: ${rosterStatus ? '#047857' : '#6b7280'};">
+                                ${profile.isImage ? (rosterStatus || 'Click to Select') : profile.fileType.toUpperCase() + ' File'}
+                            </p>
+                        </div>
+                        
+                        <div style="position: absolute; top: 4px; right: 4px;">
+                            <button ${removeAction} 
+                                    class="text-xs" style="color: #ef4444; background-color: rgba(255,255,255,0.7); border-radius: 9999px; width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; border: none;">
+                                &times;
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        async function handleFileUpload() {
+            const file = elements.textUpload.files[0];
+            if (file) {
+                state.uploadedFile = file;
+                state.rawScriptContent = null; 
+                elements.uploadedFileName.textContent = `File loaded: ${file.name}`;
+                elements.uploadedFileName.classList.remove('hidden');
+                elements.editUploadedButton.disabled = false;
+                
+                elements.scriptEditorTextarea.value = '';
+                state.downloadTitle = file.name.replace(/\.[^/.]+$/, "") + " Simulation";
+            } else {
+                state.uploadedFile = null;
+                elements.uploadedFileName.textContent = 'No script loaded.';
+                if (state.rawScriptContent === null) {
+                    elements.uploadedFileName.classList.add('hidden');
+                }
+                elements.editUploadedButton.disabled = true;
+                state.downloadTitle = "Conversation Simulation";
+            }
+        }
+
+        async function toggleScriptEditor(mode) {
+            elements.scriptUploadView.classList.add('hidden');
+            elements.scriptEditorView.classList.remove('hidden');
+
+            const editor = elements.scriptEditorTextarea;
+            
+            if (mode === 'new') {
+                editor.value = '';
+            } else if (mode === 'edit') {
+                if (state.rawScriptContent !== null) {
+                    editor.value = state.rawScriptContent;
+                } 
+                else if (state.uploadedFile) {
+                    try {
+                        const rawText = await state.uploadedFile.text();
+                        editor.value = rawText;
+                    } catch (error) {
+                        console.error("Error reading uploaded file for editing:", error);
+                        showMessageBox("Error", "Could not read the uploaded file for editing.");
+                        editor.value = '';
+                    }
+                } else {
+                    editor.value = '';
+                }
+            }
+            editor.focus();
+        }
+
+        function saveScript() {
+            const content = elements.scriptEditorTextarea.value.trim();
+            if (content.length === 0) {
+                 showMessageBox('Warning', 'The script is empty. Please enter content.');
+                 return;
+            }
+            
+            elements.textUpload.value = '';
+            state.uploadedFile = null;
+            
+            elements.uploadedFileName.textContent = 'Custom Script Ready (Click "Edit Script" to view)';
+            elements.uploadedFileName.classList.remove('hidden');
+            elements.editUploadedButton.disabled = false;
+            
+            state.rawScriptContent = content;
+            state.downloadTitle = "Custom Conversation Simulation";
+
+            elements.scriptEditorView.classList.add('hidden');
+            elements.scriptUploadView.classList.remove('hidden');
+        }
+
+        function cancelEdit() {
+            elements.scriptEditorView.classList.add('hidden');
+            elements.scriptUploadView.classList.remove('hidden');
+        }
+
+        // --- Simulation Core Functions (Shared between main app and downloadable HTML) ---
+
+        /**
+         * Parses the new bracketed script format
+         */
+        function parseConversation(rawText) {
+            if (!rawText) return [];
+            
+            const turns = rawText.split(/\n\s*\n/).filter(t => t.trim() !== '');
+            const conversationData = [];
+            
+            // Regex to match: [Speaker: Dialogue] [OptionalTags...]
+            const lineRegex = /^\s*\[(.*?:\s*.*?)]((?:\s*\[.*?])+)?\s*$/;
+            const tagRegex = /\[(.*?)\]/g; 
+
+            for (const turn of turns) {
+                const trimmedTurn = turn.trim();
+                if (!trimmedTurn) continue;
+
+                const match = trimmedTurn.match(lineRegex);
+                
+                if (match) {
+                    const speakerDialogue = match[1].trim();
+                    const optionalTagsStr = match[2] || '';
+                    const separatorIndex = speakerDialogue.indexOf(':');
+                    
+                    if (separatorIndex === -1) {
+                         console.warn('Skipping turn (missing colon in speaker/dialogue block):', trimmedTurn);
+                         continue;
+                    }
+                    
+                    const speaker = speakerDialogue.substring(0, separatorIndex).trim();
+                    const dialogue = speakerDialogue.substring(separatorIndex + 1).trim();
+
+                    if (!speaker || !dialogue) {
+                        console.warn('Skipping malformed turn (empty speaker or dialogue):', trimmedTurn);
+                        continue;
+                    }
+
+                    let delaySeconds = 0;
+                    let mediaFileName = null;
+                    let timeRange = null; 
+                    let rightSpeakerRaw = null;
+
+                    const tags = Array.from(optionalTagsStr.matchAll(tagRegex), m => m[1].trim());
+
+                    if (tags.length > 0) {
+                        const lastTag = tags[tags.length - 1]; 
+                        
+                        const isDelay = !isNaN(parseFloat(lastTag)) && isFinite(lastTag) && !lastTag.includes(':') && !lastTag.includes('.');
+                        const isTimeRange = lastTag.match(/^\d+:\d+(\.\d+)?-\d+:\d+(\.\d+)?$/);
+                        const isMediaFile = lastTag.includes('.');
+
+                        if (isDelay || isTimeRange || isMediaFile || lastTag === "") {
+                            // Last tag is likely not a right speaker name
+                            // rightSpeakerRaw remains null.
+                        } else {
+                            // Assume the last tag is the right speaker name
+                            rightSpeakerRaw = lastTag;
+                            tags.pop(); // Remove the right speaker from the general tags list
+                        }
+                    }
+
+                    tags.forEach(tag => {
+                        // Check for Delay tag
+                        if (!isNaN(parseFloat(tag)) && isFinite(tag) && !tag.includes(':') && !tag.includes('.')) {
+                            delaySeconds = parseFloat(tag);
+                        }
+                        // Check for Time Range tag
+                        else if (tag.match(/^\d+:\d+(\.\d+)?-\d+:\d+(\.\d+)?$/)) {
+                            const [startStr, endStr] = tag.split('-');
+                            timeRange = {
+                                start: timeToSeconds(startStr),
+                                end: timeToSeconds(endStr)
+                            };
+                        }
+                        // Assume Media File Name
+                        else if (tag.includes('.')) {
+                            mediaFileName = tag;
+                        }
+                    });
+
+                    conversationData.push({ 
+                        speaker: speaker, 
+                        dialogue: dialogue, 
+                        delaySeconds: delaySeconds,
+                        mediaFileName: mediaFileName,
+                        timeRange: timeRange,
+                        rightSpeakerName: rightSpeakerRaw
+                    });
+
+                } else {
+                    console.warn('Skipping malformed turn (does not match expected bracket format):', trimmedTurn);
+                }
+            }
+            return conversationData;
+        }
+        
+        async function startConversation() {
+            let rawText = state.rawScriptContent;
+            
+            if (!rawText && state.uploadedFile) {
+                try {
+                    rawText = await state.uploadedFile.text();
+                    state.rawScriptContent = rawText; // Store for download
+                } catch (error) {
+                    console.error("Error loading uploaded text file:", error);
+                    showMessageBox("Error", "Could not read the uploaded conversation text file.");
+                    return;
+                }
+            }
+            
+            if (!rawText) {
+                showMessageBox('Error', 'Please create or load a conversation script.');
+                return;
+            }
+
+            state.conversationTurns = parseConversation(rawText);
+            if (state.conversationTurns.length === 0) {
+                showMessageBox("Error", "The conversation script is empty or improperly formatted. Check the formatting guide.");
+                return;
+            }
+            
+            // --- Gather Global Options ---
+            
+            state.useEqualDelay = elements.equalTimeCheckbox.checked;
+            state.singleLineMode = elements.singleLineCheckbox.checked; 
+            
+            let delayInput = parseFloat(elements.equalTimeInput.value);
+            state.equalDelaySeconds = (isNaN(delayInput) || delayInput < 0.5) ? 0.5 : delayInput;
+
+            // 5. Switch Panels and Start
+            elements.setupPanel.classList.add('hidden');
+            // Show the simulation panel and mark it as active
+            elements.simulationPanel.classList.remove('hidden');
+            elements.simulationPanel.classList.add('active'); 
+            
+            document.addEventListener('keydown', handleKeydown);
+
+            elements.conversationText.innerHTML = ''; 
+            elements.downloadHtmlButton.classList.add('hidden'); // Hide download button until end
+            
+            resetLayout();
+            state.currentSceneCharacters = { leftKey: null, rightKey: null };
+            stopAudio(); 
+
+            // Wait for layout to settle before starting
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            processTurn(0); 
+        }
+
+        // --- Audio Control Functions ---
+        function stopAudio() {
+            if (state.currentAudio) {
+                state.currentAudio.pause();
+                state.currentAudio.currentTime = 0;
+            }
+            if (state.audioStopTimeout) {
+                clearTimeout(state.audioStopTimeout);
+                state.audioStopTimeout = null;
+            }
+            state.isAudioPlaying = false;
+        }
+
+        function playAudio(mediaFileName, timeRange) {
+            stopAudio();
+
+            // Find the profile that matches the media file name
+            const mediaProfile = state.characterProfiles.find(p => p.displayName.toLowerCase() === mediaFileName.replace(/\.[^/.]+$/, "").toLowerCase());
+
+            if (!mediaProfile) {
+                console.warn(`Media file ${mediaFileName} not found in profiles.`);
+                return;
+            }
+            
+            const audio = elements.audioPlayer;
+            audio.src = mediaProfile.fileURL;
+            audio.load();
+
+            const playMedia = () => {
+                if (timeRange && timeRange.start > 0) {
+                    audio.currentTime = timeRange.start;
+                }
+                audio.play().then(() => {
+                    state.isAudioPlaying = true;
+                    
+                    if (timeRange && timeRange.end > audio.currentTime) {
+                        const duration = (timeRange.end - audio.currentTime) * 1000;
+                        if (duration > 0) {
+                            state.audioStopTimeout = setTimeout(() => {
+                                stopAudio();
+                            }, duration);
+                        }
+                    }
+                }).catch(error => {
+                    console.error('Error playing media (check browser autoplay restrictions):', error);
+                    stopAudio();
+                });
+            };
+
+            // Ensure the event listener is attached only once per load or is handled correctly
+            audio.removeEventListener('canplaythrough', playMedia);
+            audio.addEventListener('canplaythrough', playMedia, { once: true });
+            
+            const onAudioEnd = () => {
+                 stopAudio();
+                 audio.removeEventListener('ended', onAudioEnd);
+            };
+            audio.addEventListener('ended', onAudioEnd);
+
+            state.currentAudio = audio;
+        }
+
+
+        function resetLayout() {
+            elements.leftImage.classList.remove('active-border');
+            elements.rightImage.classList.remove('active-border');
+            elements.leftImage.style.borderColor = '#808080';
+            elements.rightImage.style.borderColor = '#808080';
+            
+            // Set image sources to placeholders
+            elements.leftImage.src = BASE64_GRAY_PLACEHOLDER;
+            elements.rightImage.src = BASE64_GRAY_PLACEHOLDER;
+            elements.leftNameDisplay.textContent = '';
+            elements.rightNameDisplay.textContent = '';
+
+
+            updateLayout(true);
+        }
+
+        /**
+         * Switches the layout between multi-speaker and single-speaker modes.
+         */
+        function updateLayout(isMultiSpeaker) {
+            if (isMultiSpeaker) {
+                elements.rightSpeakerColumn.classList.remove('hidden');
+                elements.dialogueBoxColumn.classList.remove('dialogue-expanded');
+            } else {
+                elements.rightSpeakerColumn.classList.add('hidden');
+                elements.dialogueBoxColumn.classList.add('dialogue-expanded');
+            }
+        }
+
+        function nextTurn() {
+            // FIX: If conversation is over, treat click/key as exit action
+            if (state.currentTurnIndex >= state.conversationTurns.length) {
+                resetApp();
+                return;
+            }
+            
+            if (state.currentTimeout) {
+                clearTimeout(state.currentTimeout);
+                state.currentTimeout = null;
+            }
+
+            stopAudio(); 
+
+            processTurn(state.currentTurnIndex + 1); 
+        }
+        
+        function processTurn(index) {
+            if (index >= state.conversationTurns.length) {
+                endConversation();
+                return;
+            }
+            
+            state.currentTurnIndex = index;
+            const turn = state.conversationTurns[index];
+            
+            if (turn.mediaFileName) {
+                playAudio(turn.mediaFileName, turn.timeRange);
+            } else {
+                stopAudio(); 
+            }
+            
+            let delaySec = 0;
+            if (state.useEqualDelay) {
+                delaySec = state.equalDelaySeconds;
+            } else if (turn.delaySeconds > 0) {
+                delaySec = turn.delaySeconds;
+            }
+            
+            // Determine if media duration should override the delay
+            if (turn.mediaFileName && !state.useEqualDelay) {
+                 const mediaProfile = state.characterProfiles.find(p => p.displayName.toLowerCase() === turn.mediaFileName.replace(/\.[^/.]+$/, "").toLowerCase());
+
+                 if (mediaProfile) {
+                     const audio = elements.audioPlayer;
+                     audio.src = mediaProfile.fileURL;
+                     
+                     // Use duration from timeRange if provided
+                     let calculatedDuration = (turn.timeRange && turn.timeRange.end > turn.timeRange.start) 
+                                            ? (turn.timeRange.end - turn.timeRange.start) 
+                                            : 0;
+                     
+                     if (calculatedDuration > 0) {
+                         delaySec = Math.max(delaySec, calculatedDuration);
+                     } else {
+                         // Fallback to metadata load if timeRange is not set
+                         audio.onloadedmetadata = () => {
+                             if (audio.duration && audio.duration !== Infinity) {
+                                 // Only update if we are still on the current turn
+                                 if (state.currentTurnIndex === index) { 
+                                     delaySec = Math.max(delaySec, audio.duration);
+                                     startTurnTimeout(index, delaySec);
+                                 }
+                             }
+                         };
+                         // Wait for metadata to load if duration is unknown
+                         if (delaySec === 0) {
+                            // Do not set timeout here, wait for metadata
+                            // Set a small default to prevent instant advance if metadata fails
+                            delaySec = 0.5; 
+                         }
+                     }
+                 }
+            }
+
+            displayTurn(index);
+            
+            // Only set timeout if we have a definite duration or delaySec > 0 
+            // and we didn't defer timing to the audio's onloadedmetadata event
+            if (delaySec > 0 && !(turn.mediaFileName && !turn.timeRange && !state.useEqualDelay)) {
+                startTurnTimeout(index, delaySec);
+            } 
+        }
+        
+        function startTurnTimeout(turnIndex, delaySec) {
+            if (state.currentTimeout) {
+                clearTimeout(state.currentTimeout);
+                state.currentTimeout = null;
+            }
+            
+            const timeoutDuration = delaySec * 1000;
+                
+            state.currentTimeout = setTimeout(() => {
+                state.currentTimeout = null;
+                stopAudio(); 
+                processTurn(turnIndex + 1); 
+            }, timeoutDuration);
+        }
+
+        
+        function displayTurn(index) {
+            if (index < 0 || index >= state.conversationTurns.length) return; 
+
+            const turn = state.conversationTurns[index];
+            const currentSpeakerKey = turn.speaker.trim().toLowerCase();
+            const currentRightKey = turn.rightSpeakerName ? turn.rightSpeakerName.toLowerCase() : null;
+            let isMultiSpeaker = currentRightKey !== null;
+
+            // --- 1. Determine Character Layout Assignment (Locking Position) ---
+            let visualLeftKey = null; 
+            let visualRightKey = null; 
+            
+            // Current keys (excluding null/unknown)
+            const activeKeys = [currentSpeakerKey, currentRightKey]
+                                     .filter(k => k !== null && k !== 'unknown');
+                                     
+            // If only one speaker is involved, the layout is single-speaker
+            if (activeKeys.length <= 1) {
+                 visualLeftKey = currentSpeakerKey;
+                 visualRightKey = null; 
+                 state.currentSceneCharacters.leftKey = visualLeftKey;
+                 state.currentSceneCharacters.rightKey = null;
+                 isMultiSpeaker = false; 
+            } else {
+                 // Two active speakers. Assign positions consistently.
+                 if (!state.currentSceneCharacters.leftKey || !state.currentSceneCharacters.rightKey) {
+                    // First two-speaker turn, assign based on script order
+                    visualLeftKey = currentSpeakerKey;
+                    visualRightKey = currentRightKey;
+                    state.currentSceneCharacters.leftKey = visualLeftKey;
+                    state.currentSceneCharacters.rightKey = visualRightKey;
+                 } else {
+                    // Lock existing positions if the current speakers match the scene speakers
+                    if (activeKeys.includes(state.currentSceneCharacters.leftKey) && activeKeys.includes(state.currentSceneCharacters.rightKey)) {
+                         visualLeftKey = state.currentSceneCharacters.leftKey;
+                         visualRightKey = state.currentSceneCharacters.rightKey;
+                    } else {
+                        // New set of speakers, reset scene
+                        visualLeftKey = currentSpeakerKey;
+                        visualRightKey = currentRightKey;
+                        state.currentSceneCharacters.leftKey = visualLeftKey;
+                        state.currentSceneCharacters.rightKey = visualRightKey;
+                    }
+                 }
+            }
+            
+            // --- 2. Update Layout ---
+            updateLayout(visualRightKey !== null); 
+
+            // --- 3. Determine Active Speaker Highlight and Content ---
+            
+            let isLeftActive = (currentSpeakerKey === visualLeftKey);
+            let isRightActive = (currentSpeakerKey === visualRightKey);
+
+            const leftRosterEntry = state.activeRoster[visualLeftKey];
+            const rightRosterEntry = visualRightKey && visualRightKey !== 'unknown' ? state.activeRoster[visualRightKey] : null;
+
+            // --- VISUAL UPDATE: LEFT SLOT ---
+            if (visualLeftKey) {
+                if (leftRosterEntry) {
+                    elements.leftImage.src = leftRosterEntry.imageURL;
+                    elements.leftNameDisplay.textContent = leftRosterEntry.displayName;
+                    elements.leftImage.style.borderColor = '#808080'; 
+                    elements.leftImage.classList.remove('active-border');
+                    
+                    if (isLeftActive) {
+                        elements.leftImage.classList.add('active-border');
+                        elements.leftImage.style.borderColor = leftRosterEntry.color;
+                    }
+                } else {
+                    elements.leftImage.src = BASE64_GRAY_PLACEHOLDER; 
+                    elements.leftNameDisplay.textContent = visualLeftKey;
+                    elements.leftImage.style.borderColor = '#808080';
+                }
+            } else {
+                elements.leftImage.src = BASE64_GRAY_PLACEHOLDER;
+                elements.leftNameDisplay.textContent = '';
+                elements.leftImage.style.borderColor = '#808080';
+            }
+
+
+            // --- VISUAL UPDATE: RIGHT SLOT ---
+            elements.rightImage.style.borderColor = '#808080'; 
+            elements.rightImage.classList.remove('active-border');
+            
+            if (visualRightKey !== null) {
+                if (visualRightKey === 'unknown') {
+                    elements.rightImage.src = BASE64_BLACK_PLACEHOLDER; 
+                    elements.rightNameDisplay.textContent = 'Unknown';
+                    elements.rightNameDisplay.style.color = 'black';
+                } 
+                else if (rightRosterEntry) {
+                    elements.rightImage.src = rightRosterEntry.imageURL;
+                    elements.rightNameDisplay.textContent = rightRosterEntry.displayName;
+                    elements.rightNameDisplay.style.color = rightRosterEntry.color;
+                    
+                    if (isRightActive) {
+                        elements.rightImage.classList.add('active-border');
+                        elements.rightImage.style.borderColor = rightRosterEntry.color;
+                    } else {
+                         elements.rightImage.style.borderColor = '#808080';
+                    }
+                } else {
+                     elements.rightImage.src = BASE64_GRAY_PLACEHOLDER; 
+                     elements.rightNameDisplay.textContent = visualRightKey;
+                     elements.rightNameDisplay.style.color = 'black';
+                }
+            } else {
+                 elements.rightImage.src = BASE64_GRAY_PLACEHOLDER; 
+                 elements.rightNameDisplay.textContent = '';
+                 elements.rightNameDisplay.style.color = 'black';
+            }
+            
+            // 4. --- Display Text ---
+            const activeColor = state.activeRoster[currentSpeakerKey]?.color || 'black';
+            const formattedText = `<span style="color: ${activeColor}; font-weight: bold;">${turn.speaker}: </span><span style="color: black; font-weight: normal;">${turn.dialogue}</span>`;
+            
+            if (state.singleLineMode) {
+                elements.conversationText.innerHTML = ''; 
+            }
+            
+            elements.conversationText.innerHTML += formattedText + '\n\n';
+            
+            const textBox = elements.conversationTextArea;
+            textBox.scrollTop = textBox.scrollHeight;
+        }
+
+        function endConversation() {
+            state.currentTurnIndex = state.conversationTurns.length; 
+            stopAudio(); 
+            
+            // Remove active borders from portraits
+            elements.leftImage.classList.remove('active-border');
+            elements.rightImage.classList.remove('active-border');
+            elements.leftImage.style.borderColor = '#808080';
+            elements.rightImage.style.borderColor = '#808080';
+            
+            const textBox = elements.conversationTextArea;
+            textBox.scrollTop = textBox.scrollHeight;
+
+            elements.endStatusText.textContent = '-- Conversation Ended -- Click or Press Space/Enter to Exit.';
+            elements.endStatusContainer.classList.remove('hidden'); 
+            elements.downloadHtmlButton.classList.remove('hidden'); // Show download button - FIXED LINE
+        }
+
+        function resetApp() {
+            if (state.currentTimeout) {
+                clearTimeout(state.currentTimeout);
+                state.currentTimeout = null;
+            }
+            stopAudio();
+            
+            document.removeEventListener('keydown', handleKeydown);
+            
+            elements.simulationPanel.classList.add('hidden');
+            elements.simulationPanel.classList.remove('active'); // Remove active class
+            elements.setupPanel.classList.remove('hidden');
+            
+            elements.endStatusContainer.classList.add('hidden');
+            elements.downloadHtmlButton.classList.add('hidden');
+            
+            state.conversationTurns = [];
+            state.currentTurnIndex = -1;
+            state.currentSceneCharacters = { leftKey: null, rightKey: null }; 
+            elements.conversationText.innerHTML = ''; 
+            
+            updateLayout(true);
+        }
+        
+        function handleKeydown(event) {
+            if (event.key === ' ' || event.key === 'Enter') {
+                if (!elements.simulationPanel.classList.contains('hidden')) {
+                    event.preventDefault(); 
+                    nextTurn();
+                }
+            }
+        }
+        
+        // --- Downloadable HTML Generation ---
+
+        function generateDownloadableHtml() {
+            let scriptContent = state.rawScriptContent;
+            if ((!scriptContent || scriptContent.trim() === '') && state.uploadedFile) {
+                if (typeof state.uploadedFile.text === 'function') {
+                    state.uploadedFile.text().then(text => {
+                        state.rawScriptContent = text;
+                        scriptContent = text;
+                        actuallyGenerate();
+                    });
+                    return;
+                }
+            }
+            
+            if ((!scriptContent || scriptContent.trim() === '') || Object.keys(state.activeRoster).length === 0) {
+                showMessageBox('Error', 'Cannot download. Ensure a script is loaded and at least one character is in the Roster.');
+                return;
+            }
+            actuallyGenerate();
+
+            function actuallyGenerate() {
+                // Use the same parsing function as the main app to ensure consistency
+                if (state.rawScriptContent && (!state.conversationTurns || state.conversationTurns.length === 0)) {
+                    state.conversationTurns = parseConversation(state.rawScriptContent);
+                }
+
+                console.log('Current state:', { 
+                    rawScriptContent: state.rawScriptContent ? state.rawScriptContent.substring(0, 100) + '...' : 'Missing',
+                    profileCount: state.characterProfiles.length,
+                    rosterCount: Object.keys(state.activeRoster).length,
+                    turnsCount: state.conversationTurns.length
+                });
+
+                // Create packaged data
+                const packagedData = {
+                    rawScriptContent: state.rawScriptContent,
+                    activeRoster: {},
+                    characterProfiles: [],
+                    useEqualDelay: state.useEqualDelay,
+                    equalDelaySeconds: state.equalDelaySeconds,
+                    singleLineMode: state.singleLineMode,
+                };
+
+                // Package active roster
+                for (const [key, rosterItem] of Object.entries(state.activeRoster)) {
+                    const profile = state.characterProfiles.find(p => p.id === rosterItem.profileId);
+                    if (profile) {
+                        packagedData.activeRoster[key] = {
+                            ...rosterItem,
+                            imageURL: profile.imageURL,
+                            fileURL: profile.fileURL
+                        };
+                    }
+                }
+
+                // Package used profiles
+                const usedProfileIds = new Set();
+                Object.values(state.activeRoster).forEach(rosterItem => {
+                    usedProfileIds.add(rosterItem.profileId);
+                });
+                state.conversationTurns.forEach(turn => {
+                    if (turn.mediaFileName) {
+                        const mediaName = turn.mediaFileName.replace(/\.[^/.]+$/, "").toLowerCase();
+                        const mediaProfile = state.characterProfiles.find(p => 
+                            p.displayName.toLowerCase() === mediaName
+                        );
+                        if (mediaProfile) usedProfileIds.add(mediaProfile.id);
+                    }
+                });
+
+                packagedData.characterProfiles = state.characterProfiles
+                    .filter(profile => usedProfileIds.has(profile.id))
+                    .map(profile => ({
+                        id: profile.id,
+                        displayName: profile.displayName,
+                        imageURL: profile.imageURL,
+                        fileURL: profile.fileURL,
+                        fileType: profile.fileType,
+                        isImage: profile.isImage
+                    }));
+
+                // SIMPLIFIED JSON ESCAPING - Avoid over-escaping
+                const dataJsonString = JSON.stringify(packagedData)
+                    .replace(/\//g, '\\/')
+                    .replace(/\u2028/g, '\\u2028')
+                    .replace(/\u2029/g, '\\u2029');
+
+                const templateHtml = `<!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>${state.downloadTitle}</title>
+            <style>
+                body { margin: 0; padding: 20px; display: flex; align-items: center; justify-content: center; min-height: 100vh; background-color: #d9d9d9; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+                .tkinter-bg { background-color: #d9d9d9; }
+                .tkinter-widget-border { border: 1px solid #808080; box-shadow: 1px 1px 0px #ffffff, -1px -1px 0px #ffffff, 2px 2px 0px #000000; border-radius: 0; }
+                .tkinter-text-area { font-family: monospace, 'Courier New', Courier, sans-serif; resize: none; border-radius: 0; background-color: white; padding: 4px; width: 100%; box-sizing: border-box; border: 1px solid #ccc; }
+                #app-container { width: 100%; max-width: 1024px; padding: 16px; display: flex; flex-direction: column; gap: 16px; }
+                .active-border { border-width: 5px !important; box-shadow: 0 0 10px rgba(255, 255, 0, 0.7); }
+                .hidden { display: none !important; }
+                .dialogue-expanded { width: 75% !important; }
+                
+                #simulation-panel { max-width: 100%; height: 18rem; overflow: hidden; }
+                #simulation-layout-container { display: flex; gap: 16px; align-items: flex-start; height: 100%; }
+                #left-speaker-column, #right-speaker-column { width: 25%; display: flex; flex-direction: column; align-items: center; flex-shrink: 0; }
+                .image-container-lg { width: 12rem; height: 12rem; display: flex; align-items: center; justify-content: center; border: 1px solid #808080; }
+                .object-contain { object-fit: contain; width: 100%; height: 100%; }
+                
+                #dialogue-box-column { width: 50%; flex-grow: 1; display: flex; flex-direction: column; height: 14rem; }
+                #conversation-text-area { flex-grow: 1; overflow-y: auto; cursor: pointer; padding: 8px; }
+                #conversation-text { min-height: 100%; margin: 0; white-space: pre-wrap; font-size: 1rem; }
+
+                .font-bold { font-weight: 700; }
+                .mt-2 { margin-top: 8px; }
+                .text-center { text-align: center; }
+                .text-black { color: black; }
+                .tkinter-button { background-color: #e1e1e1; cursor: pointer; user-select: none; padding: 8px 16px; border: 1px solid #808080; box-shadow: 1px 1px 0px #ffffff, -1px -1px 0px #ffffff, 2px 2px 0px #000000; border-radius: 0; text-align: center; }
+                .tkinter-button:active { box-shadow: 1px 1px 0px #000000, -1px -1px 0px #000000, 0px 0px 0px #ffffff; transform: translateY(1px); }
+                .text-sm { font-size: 0.875rem; }
+                .text-green-700 { color: #047857; }
+            </style>
+        </head>
+        <body class="tkinter-bg">
+            <div id="app-container" class="tkinter-bg tkinter-widget-border">
+                <h1 class="font-bold mb-4" style="font-size: 1.25rem;">${state.downloadTitle} (Playback)</h1>
+                
+                <div id="simulation-panel" class="p-4 tkinter-widget-border bg-white">
+                    <div id="simulation-layout-container">
+                        <div id="left-speaker-column">
+                            <div class="image-container-lg tkinter-widget-border mb-2">
+                                <img id="left-speaker-image" class="object-contain" style="border: 2px solid #808080;" alt="Left Speaker">
+                            </div>
+                            <p id="left-speaker-name-display" class="font-bold mt-2 text-center text-black"></p>
+                        </div>
+
+                        <div id="dialogue-box-column">
+                            <audio id="audio-player" class="hidden"></audio>
+                            <div id="conversation-text-area" class="p-2 tkinter-widget-border bg-white cursor-pointer">
+                                <p id="conversation-text" class="tkinter-text-area whitespace-pre-wrap text-base h-full"></p>
+                            </div>
+                        </div>
+
+                        <div id="right-speaker-column">
+                            <div class="image-container-lg tkinter-widget-border mb-2">
+                                <img id="right-speaker-image" class="object-contain" style="border: 2px solid #808080;" alt="Right Speaker">
+                            </div>
+                            <p id="right-speaker-name-display" class="font-bold mt-2 text-center text-black"></p>
+                        </div>
+                    </div>
+                    
+                    <div id="end-status-container" style="margin-top: 16px; padding-top: 8px; border-top: 1px solid #e5e7eb; text-align: center; display: none;">
+                        <p id="end-status-text" class="text-sm font-bold text-green-700">-- Conversation Ended. Reload to Restart --</p>
+                        <button onclick="window.location.reload()" class="tkinter-button text-sm" style="background-color: #2563eb; color: white; margin-top: 8px;">
+                            Restart Simulation
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <script>
+                // Base64 placeholders
+                const BASE64_GRAY_PLACEHOLDER = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAHklEQVR42mNgoBr4j4oYmQEKMBYwE4gI0YJ/CgYADa8E7oO1CbgAAAAASUVORK5CYII=';
+                const BASE64_BLACK_PLACEHOLDER = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAADFJREFUOE9jZMAEQjB/w/2P7D8cW4wTzBj0oR5wUzAo4FSAh4YwS0BfIAEAm6EE7B/f8O8AAAAASUVORK5CYII=';
+
+                // *** EMBEDDED CONVERSATION DATA ***
+                const DOWNLOAD_CONVERSATION_DATA = ${dataJsonString};
+
+                let state;
+                let elements;
+
+                function timeToSeconds(timeStr) {
+                    if (!timeStr) return 0;
+                    const parts = timeStr.split(':');
+                    if (parts.length === 2) { 
+                        return parseInt(parts[0], 10) * 60 + parseFloat(parts[1]); 
+                    }
+                    return 0;
+                }
+
+                // SIMPLIFIED PARSING FUNCTION - No complex regex escaping
+                function parseConversation(rawText) {
+                    if (!rawText) {
+                        console.warn('No raw text provided to parser');
+                        return [];
+                    }
+                    
+                    console.log('Parsing raw script content');
+                    
+                    // Simple line splitting - treat each line as a separate turn
+                    const lines = rawText.split('\\n');
+                    const conversationData = [];
+                    
+                    console.log('Lines found:', lines.length);
+
+                    for (let i = 0; i < lines.length; i++) {
+                        const line = lines[i].trim();
+                        if (!line) continue;
+
+                        console.log('Processing line:', line);
+
+                        // Skip lines that don't start with [
+                        if (!line.startsWith('[')) {
+                            console.log('Skipping line - does not start with [');
+                            continue;
+                        }
+
+                        // Simple bracket extraction without complex regex
+                        const bracketContents = [];
+                        let currentIndex = 0;
+                        
+                        while (currentIndex < line.length) {
+                            const openBracket = line.indexOf('[', currentIndex);
+                            if (openBracket === -1) break;
+                            
+                            const closeBracket = line.indexOf(']', openBracket);
+                            if (closeBracket === -1) break;
+                            
+                            const content = line.substring(openBracket + 1, closeBracket).trim();
+                            if (content) {
+                                bracketContents.push(content);
+                            }
+                            
+                            currentIndex = closeBracket + 1;
+                        }
+
+                        if (bracketContents.length === 0) {
+                            console.log('Skipping line - no valid bracket contents');
+                            continue;
+                        }
+
+                        // First bracket should be Speaker: Dialogue
+                        const firstContent = bracketContents[0];
+                        const colonIndex = firstContent.indexOf(':');
+                        
+                        if (colonIndex === -1) {
+                            console.log('Skipping line - no colon in first bracket');
+                            continue;
+                        }
+
+                        const speaker = firstContent.substring(0, colonIndex).trim();
+                        const dialogue = firstContent.substring(colonIndex + 1).trim();
+
+                        if (!speaker || !dialogue) {
+                            console.log('Skipping line - empty speaker or dialogue');
+                            continue;
+                        }
+
+                        const turnData = {
+                            speaker: speaker,
+                            dialogue: dialogue,
+                            delaySeconds: 0,
+                            mediaFileName: null,
+                            timeRange: null,
+                            rightSpeakerName: null
+                        };
+
+                        // Process remaining brackets
+                        for (let j = 1; j < bracketContents.length; j++) {
+                            const content = bracketContents[j];
+                            
+                            // Check for numeric delay
+                            if (!isNaN(content) && content.trim() !== '') {
+                                turnData.delaySeconds = parseFloat(content);
+                            }
+                            // Check for time range (contains - and :)
+                            else if (content.includes('-') && content.includes(':')) {
+                                const [start, end] = content.split('-');
+                                turnData.timeRange = {
+                                    start: timeToSeconds(start),
+                                    end: timeToSeconds(end)
+                                };
+                            }
+                            // Check for media file (contains .)
+                            else if (content.includes('.')) {
+                                turnData.mediaFileName = content;
+                            }
+                            // Otherwise assume it's a right speaker name
+                            else {
+                                turnData.rightSpeakerName = content;
+                            }
+                        }
+
+                        console.log('Parsed turn:', turnData);
+                        conversationData.push(turnData);
+                    }
+
+                    console.log('Successfully parsed turns:', conversationData.length);
+                    return conversationData;
+                }
+
+                function stopAudio() {
+                    if (state.currentAudio) {
+                        state.currentAudio.pause();
+                        state.currentAudio.currentTime = 0;
+                        state.currentAudio = null;
+                    }
+                    if (state.audioStopTimeout) {
+                        clearTimeout(state.audioStopTimeout);
+                        state.audioStopTimeout = null;
+                    }
+                    state.isAudioPlaying = false;
+                }
+
+                // FIXED AUDIO PLAYBACK FUNCTION - Only plays after user interaction
+                function playAudio(mediaFileName, timeRange) {
+                    stopAudio();
+                    if (!mediaFileName) return;
+                    
+                    const mediaName = mediaFileName.replace(/\\.[^/.]+$/, "").toLowerCase();
+                    const mediaProfile = state.characterProfiles.find(p => 
+                        p.displayName.toLowerCase() === mediaName
+                    );
+
+                    if (!mediaProfile) { 
+                        console.warn('Media file not found:', mediaFileName);
+                        return; 
+                    }
+                    
+                    console.log('Loading audio:', mediaFileName, 'Time range:', timeRange);
+                    
+                    const audio = new Audio();
+                    audio.src = mediaProfile.fileURL;
+                    state.currentAudio = audio;
+                    
+                    // Set up event listeners for better audio handling
+                    audio.addEventListener('loadeddata', function() {
+                        console.log('Audio loaded, duration:', audio.duration, 'seconds');
+                        
+                        if (timeRange) {
+                            console.log('Setting time range:', timeRange.start, 'to', timeRange.end, 'seconds');
+                            audio.currentTime = timeRange.start;
+                            
+                            // Calculate the actual duration to play
+                            const playDuration = (timeRange.end - timeRange.start) * 1000;
+                            console.log('Will play for', playDuration / 1000, 'seconds');
+                            
+                            // Set timeout to stop at the end of the time range
+                            state.audioStopTimeout = setTimeout(() => {
+                                console.log('Reached end of time range, stopping audio');
+                                stopAudio();
+                            }, playDuration);
+                        }
+                        
+                        // DON'T try to autoplay - wait for user interaction
+                        console.log('Audio ready - will play on next user interaction');
+                    });
+                    
+                    audio.addEventListener('error', function(e) {
+                        console.error('Error loading audio:', e);
+                        stopAudio();
+                    });
+                    
+                    audio.addEventListener('ended', function() {
+                        console.log('Audio ended naturally');
+                        stopAudio();
+                    });
+                    
+                    // Load the audio but don't play it
+                    audio.load();
+                }
+
+                // NEW FUNCTION: Play audio when user interacts
+                function playCurrentAudio() {
+                    if (state.currentAudio && !state.isAudioPlaying) {
+                        console.log('Playing audio on user interaction');
+                        const playPromise = state.currentAudio.play();
+                        
+                        if (playPromise !== undefined) {
+                            playPromise.then(() => {
+                                console.log('Audio playing successfully');
+                                state.isAudioPlaying = true;
+                            }).catch(error => {
+                                console.warn('Audio play failed:', error);
+                            });
+                        }
+                    }
+                }
+
+                function resetLayout() {
+                    if (elements.leftImage) {
+                        elements.leftImage.classList.remove('active-border');
+                        elements.rightImage.classList.remove('active-border');
+                        elements.leftImage.style.borderColor = '#808080';
+                        elements.rightImage.style.borderColor = '#808080';
+                        elements.leftImage.src = BASE64_GRAY_PLACEHOLDER;
+                        elements.rightImage.src = BASE64_GRAY_PLACEHOLDER;
+                        elements.leftNameDisplay.textContent = '';
+                        elements.rightNameDisplay.textContent = '';
+                    }
+                    updateLayout(true);
+                }
+
+                function updateLayout(isMultiSpeaker) {
+                    if (isMultiSpeaker) {
+                        elements.rightSpeakerColumn.classList.remove('hidden');
+                        elements.dialogueBoxColumn.classList.remove('dialogue-expanded');
+                    } else {
+                        elements.rightSpeakerColumn.classList.add('hidden');
+                        elements.dialogueBoxColumn.classList.add('dialogue-expanded');
+                    }
+                }
+
+                function processTurn(index) {
+                    if (index >= state.conversationTurns.length) { 
+                        endConversation(); 
+                        return; 
+                    }
+                    
+                    state.currentTurnIndex = index;
+                    const turn = state.conversationTurns[index];
+                    
+                    console.log('Processing turn:', index, turn);
+                    
+                    // Load audio for this turn if specified (but don't play it yet)
+                    if (turn.mediaFileName) { 
+                        console.log('This turn has audio:', turn.mediaFileName, 'with time range:', turn.timeRange);
+                        playAudio(turn.mediaFileName, turn.timeRange); 
+                    } else { 
+                        console.log('This turn has no audio');
+                        stopAudio(); 
+                    }
+                    
+                    displayTurn(index);
+                    
+                    // Don't set automatic timeout - wait for user click
+                    console.log('Waiting for user click to advance...');
+                }
+                
+                function advanceToNextTurn() {
+                    if (state.currentTurnIndex >= state.conversationTurns.length) {
+                        return;
+                    }
+                    if (state.currentTimeout) {
+                        clearTimeout(state.currentTimeout);
+                        state.currentTimeout = null;
+                    }
+                    stopAudio();
+                    processTurn(state.currentTurnIndex + 1);
+                }
+
+                function displayTurn(index) {
+                    if (index < 0 || index >= state.conversationTurns.length) return; 
+
+                    const turn = state.conversationTurns[index];
+                    const currentSpeakerKey = turn.speaker.trim().toLowerCase();
+                    const currentRightKey = turn.rightSpeakerName ? turn.rightSpeakerName.toLowerCase() : null;
+                    
+                    console.log('Displaying turn:', index, 'Speaker:', currentSpeakerKey, 'Right:', currentRightKey);
+
+                    let visualLeftKey = null; 
+                    let visualRightKey = null; 
+                    
+                    // Reset scene characters if this is the first turn
+                    if (index === 0) {
+                        state.currentSceneCharacters = { leftKey: null, rightKey: null };
+                    }
+                    
+                    const activeKeys = [currentSpeakerKey, currentRightKey].filter(k => k !== null && k !== 'unknown');
+                                                    
+                    if (activeKeys.length <= 1) {
+                        // Single speaker - put on left
+                        visualLeftKey = currentSpeakerKey;
+                        visualRightKey = null; 
+                        state.currentSceneCharacters.leftKey = visualLeftKey;
+                        state.currentSceneCharacters.rightKey = null;
+                    } else {
+                        // Two speakers - assign positions correctly
+                        if (!state.currentSceneCharacters.leftKey || !state.currentSceneCharacters.rightKey) {
+                            // First two-speaker turn - assign current speaker to left, right speaker to right
+                            visualLeftKey = currentSpeakerKey;
+                            visualRightKey = currentRightKey;
+                            state.currentSceneCharacters.leftKey = visualLeftKey;
+                            state.currentSceneCharacters.rightKey = visualRightKey;
+                        } else {
+                            // Use existing positions
+                            visualLeftKey = state.currentSceneCharacters.leftKey;
+                            visualRightKey = state.currentSceneCharacters.rightKey;
+                        }
+                    }
+                    
+                    updateLayout(visualRightKey !== null); 
+
+                    let isLeftActive = (currentSpeakerKey === visualLeftKey);
+                    let isRightActive = (currentSpeakerKey === visualRightKey);
+
+                    const leftRosterEntry = state.activeRoster[visualLeftKey];
+                    const rightRosterEntry = visualRightKey && visualRightKey !== 'unknown' ? state.activeRoster[visualRightKey] : null;
+
+                    console.log('Left speaker:', visualLeftKey, 'Right speaker:', visualRightKey);
+                    console.log('Left active:', isLeftActive, 'Right active:', isRightActive);
+
+                    // Update left speaker
+                    if (visualLeftKey) {
+                        if (leftRosterEntry) {
+                            elements.leftImage.src = leftRosterEntry.imageURL;
+                            elements.leftNameDisplay.textContent = leftRosterEntry.displayName;
+                            elements.leftImage.style.borderColor = '#808080';
+                            elements.leftImage.classList.remove('active-border');
+                            if (isLeftActive) {
+                                elements.leftImage.classList.add('active-border');
+                                elements.leftImage.style.borderColor = leftRosterEntry.color;
+                            }
+                        } else {
+                            elements.leftImage.src = BASE64_GRAY_PLACEHOLDER;
+                            elements.leftNameDisplay.textContent = visualLeftKey;
+                        }
+                    }
+
+                    // Update right speaker - FIXED: Use the right speaker's own image
+                    elements.rightImage.style.borderColor = '#808080';
+                    elements.rightImage.classList.remove('active-border');
+                    
+                    if (visualRightKey !== null) {
+                        if (visualRightKey === 'unknown') {
+                            elements.rightImage.src = BASE64_BLACK_PLACEHOLDER;
+                            elements.rightNameDisplay.textContent = 'Unknown';
+                        } else if (rightRosterEntry) {
+                            // CRITICAL FIX: Use right speaker's own image, not the left speaker's
+                            elements.rightImage.src = rightRosterEntry.imageURL;
+                            elements.rightNameDisplay.textContent = rightRosterEntry.displayName;
+                            elements.rightNameDisplay.style.color = rightRosterEntry.color;
+                            if (isRightActive) {
+                                elements.rightImage.classList.add('active-border');
+                                elements.rightImage.style.borderColor = rightRosterEntry.color;
+                            }
+                        } else {
+                            elements.rightImage.src = BASE64_GRAY_PLACEHOLDER;
+                            elements.rightNameDisplay.textContent = visualRightKey;
+                        }
+                    } else {
+                        elements.rightImage.src = BASE64_GRAY_PLACEHOLDER;
+                        elements.rightNameDisplay.textContent = '';
+                    }
+
+                    // Display text
+                    const activeColor = state.activeRoster[currentSpeakerKey]?.color || 'black';
+                    const formattedText = '<span style="color: ' + activeColor + '; font-weight: bold;">' + turn.speaker + ': </span><span style="color: black; font-weight: normal;">' + turn.dialogue + '</span>';
+                    
+                    if (state.singleLineMode) { 
+                        elements.conversationText.innerHTML = ''; 
+                    }
+                    
+                    elements.conversationText.innerHTML += formattedText + '\\n\\n';
+                    elements.conversationTextArea.scrollTop = elements.conversationTextArea.scrollHeight;
+                }
+
+                function endConversation() {
+                    state.currentTurnIndex = state.conversationTurns.length;
+                    stopAudio();
+                    elements.leftImage.classList.remove('active-border');
+                    elements.rightImage.classList.remove('active-border');
+                    elements.leftImage.style.borderColor = '#808080';
+                    elements.rightImage.style.borderColor = '#808080';
+                    elements.endStatusContainer.style.display = '';
+                }
+                
+                function nextTurn() {
+                    // Play any audio that's loaded for the current turn
+                    playCurrentAudio();
+                    
+                    // Then advance to next turn
+                    advanceToNextTurn();
+                }
+
+                function handleKeydown(event) {
+                    if (event.key === ' ' || event.key === 'Enter') {
+                        event.preventDefault();
+                        nextTurn();
+                    }
+                }
+
+                function initializeSimulation() {
+                    console.log('Initializing simulation with data:', DOWNLOAD_CONVERSATION_DATA);
+                    
+                    state = {
+                        conversationTurns: [],
+                        currentTurnIndex: -1,
+                        characterProfiles: DOWNLOAD_CONVERSATION_DATA.characterProfiles || [],
+                        activeRoster: DOWNLOAD_CONVERSATION_DATA.activeRoster || {},
+                        rawScriptContent: DOWNLOAD_CONVERSATION_DATA.rawScriptContent,
+                        useEqualDelay: DOWNLOAD_CONVERSATION_DATA.useEqualDelay || false,
+                        equalDelaySeconds: DOWNLOAD_CONVERSATION_DATA.equalDelaySeconds || 3,
+                        singleLineMode: DOWNLOAD_CONVERSATION_DATA.singleLineMode || true,
+                        currentTimeout: null,
+                        currentSceneCharacters: { leftKey: null, rightKey: null },
+                        currentAudio: null,
+                        audioStopTimeout: null,
+                        isAudioPlaying: false,
+                    };
+
+                    // Parse conversation
+                    if (state.rawScriptContent) {
+                        console.log('Parsing raw script content');
+                        state.conversationTurns = parseConversation(state.rawScriptContent);
+                    } else {
+                        console.warn('No raw script content available');
+                    }
+
+                    console.log('Initialized state:', {
+                        profiles: state.characterProfiles.length,
+                        roster: Object.keys(state.activeRoster).length,
+                        turns: state.conversationTurns.length
+                    });
+
+                    // Initialize elements
+                    elements = {
+                        dialogueBoxColumn: document.getElementById('dialogue-box-column'),
+                        leftSpeakerColumn: document.getElementById('left-speaker-column'),
+                        rightSpeakerColumn: document.getElementById('right-speaker-column'),
+                        leftImage: document.getElementById('left-speaker-image'),
+                        rightImage: document.getElementById('right-speaker-image'),
+                        leftNameDisplay: document.getElementById('left-speaker-name-display'),
+                        rightNameDisplay: document.getElementById('right-speaker-name-display'),
+                        conversationText: document.getElementById('conversation-text'),
+                        conversationTextArea: document.getElementById('conversation-text-area'),
+                        audioPlayer: document.getElementById('audio-player'),
+                        endStatusText: document.getElementById('end-status-text'),
+                        endStatusContainer: document.getElementById('end-status-container')
+                    };
+
+                    // Add click event to conversation area
+                    elements.conversationTextArea.addEventListener('click', nextTurn);
+                    
+                    // Start the conversation only if we have turns
+                    if (state.conversationTurns.length > 0) {
+                        resetLayout();
+                        processTurn(0);
+                    } else {
+                        console.error('No conversation turns to display');
+                        elements.conversationText.innerHTML = 'Error: No conversation turns could be parsed from the script. Check the script format.';
+                    }
+                }
+
+                // Initialize when DOM is loaded
+                document.addEventListener('DOMContentLoaded', function() {
+                    document.addEventListener('keydown', handleKeydown);
+                    initializeSimulation();
+                });
+            <\/script>
+        </body>
+        </html>`;
+
+                // Trigger Download
+                downloadFile(`${state.downloadTitle.replace(/[^a-zA-Z0-9]/g, '_')}.html`, templateHtml, 'text/html');
+                
+                showMessageBox('Download Started', `"${state.downloadTitle}.html" is being downloaded. Open the file to run the simulation independently.`);
+            }
+        }
+
+
+// Initialize display
+        document.addEventListener('DOMContentLoaded', () => {
+            renderCharacterList();
+            renderRoster();
+            handleFileUpload(); 
+            // Hide the simulation panel on load
+            elements.simulationPanel.classList.add('hidden');
+        });
+
+    </script>
+</body>
+</html>
