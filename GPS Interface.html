@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GPS Route Planner</title>
+    <!-- 1. Leaflet CSS for the map -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <style>
+        /* Modernized Windows 98/XP-style CSS */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: "Segoe UI", "Helvetica", Arial, sans-serif;
+            background-color: #f0f0f0;
+            padding: 10px;
+        }
+        
+        .window {
+            background-color: #f0f0f0;
+            border: 2px solid #dcdcdc;
+            box-shadow: 3px 3px 0px #808080;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        
+        .title-bar {
+            background: linear-gradient(to right, #0054a6 0%, #00aaff 100%);
+            color: white;
+            padding: 4px 6px;
+            font-weight: bold;
+            font-size: 13px;
+        }
+        
+        .content {
+            padding: 15px;
+            background-color: #f0f0f0;
+        }
+        
+        .frame {
+            border: 2px groove #dcdcdc;
+            padding: 10px;
+            margin-bottom: 10px;
+            background-color: #e8e8e8;
+            box-shadow: inset 1px 1px 2px #c0c0c0;
+        }
+        
+        .frame-title {
+            font-weight: bold;
+            margin-bottom: 8px;
+            font-size: 14px;
+            color: #333;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 3px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        
+        input[type="text"], input[type="number"] {
+            width: 100%;
+            padding: 5px 7px;
+            border: 2px inset #dcdcdc;
+            background-color: white;
+            font-family: inherit;
+            font-size: 12px;
+            margin-bottom: 8px;
+        }
+        
+        select {
+            padding: 5px;
+            border: 2px outset #dcdcdc;
+            background-color: #f0f0f0;
+            font-family: inherit;
+            font-size: 12px;
+            margin-bottom: 8px;
+        }
+        
+        button {
+            padding: 6px 15px;
+            border: 2px outset #dcdcdc;
+            background-color: #dcdcdc;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 12px;
+            margin-right: 5px;
+            margin-bottom: 5px;
+            box-shadow: 1px 1px 0px #808080;
+            transition: all 0.05s;
+        }
+        
+        button:hover {
+            background-color: #c8c8c8;
+        }
+
+        button:active {
+            border-style: inset;
+            box-shadow: none;
+            transform: translate(1px, 1px);
+        }
+        
+        button:disabled {
+            color: #808080;
+            cursor: default;
+            box-shadow: none;
+        }
+        
+        .button-row {
+            margin-top: 10px;
+        }
+        
+        .location-item {
+            background-color: white;
+            border: 1px solid #808080;
+            padding: 8px;
+            margin-bottom: 5px;
+            position: relative;
+            box-shadow: inset 0 0 5px rgba(0,0,0,0.1);
+        }
+        
+        .location-item input {
+            margin-bottom: 5px;
+        }
+        
+        .remove-btn {
+            padding: 2px 8px;
+            font-size: 11px;
+            margin-right: 0;
+            float: right;
+        }
+        
+        .conditional-section {
+            margin-top: 8px;
+            padding: 8px;
+            background-color: #f0f0f0;
+            border: 1px solid #c0c0c0;
+            border-radius: 3px;
+        }
+        
+        /* Map and result styles */
+        #map {
+            height: 350px; /* Set a height for the map container */
+            margin-bottom: 15px;
+            border: 2px inset #dcdcdc;
+            background-color: white;
+            z-index: 1; /* Ensure map layers are above other elements */
+        }
+
+        .results-container {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .results {
+            border: 2px inset #dcdcdc;
+            padding: 10px;
+            background-color: #ffffff;
+            min-height: 200px;
+            max-height: 400px;
+            overflow-y: auto;
+            font-size: 12px;
+            white-space: pre-wrap;
+            font-family: 'Consolas', 'Courier New', monospace;
+            line-height: 1.4;
+        }
+        
+        .error {
+            color: #c00000;
+            font-weight: bold;
+        }
+        
+        .success {
+            color: #006400;
+            font-weight: bold;
+        }
+        
+        .route-segment {
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px dashed #c0c0c0;
+        }
+        
+        .route-header {
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: #0054a6;
+        }
+        
+        .step {
+            margin-left: 15px;
+            margin-bottom: 3px;
+        }
+    </style>
+</head>
+<body>
+    <div class="window">
+        <div class="title-bar">GPS Route Planner</div>
+        <div class="content">
+            <div class="frame">
+                <div class="frame-title">Route Configuration</div>
+                
+                <label>Start Location:</label>
+                <input type="text" id="startLoc" placeholder="e.g., New York, NY" value="San Francisco, CA">
+                
+                <div id="intermediaryContainer"></div>
+                
+                <button onclick="addIntermediary()">Add Waypoint</button>
+                
+                <label style="margin-top: 10px;">End Location:</label>
+                <input type="text" id="endLoc" placeholder="e.g., Boston, MA" value="San Jose, CA">
+                
+                <div style="margin-top: 10px;">
+                    <label>Travel Mode:</label>
+                    <select id="travelMode">
+                        <option value="driving-car">Driving</option>
+                        <option value="foot-walking">Walking</option>
+                        <option value="cycling-regular">Biking</option>
+                    </select>
+                </div>
+                
+                <div class="button-row">
+                    <button onclick="calculateRoute()">Calculate Route</button>
+                    <button onclick="clearAll()">Clear All</button>
+                </div>
+            </div>
+            
+            <div class="frame">
+                <div class="frame-title">Results</div>
+                
+                <!-- Map Container -->
+                <div id="map"></div> 
+                
+                <div class="results-container">
+                    <!-- Text Results -->
+                    <div id="results" class="results">Enter locations and click "Calculate Route" to see directions and travel time. Try adding a waypoint like "Palo Alto, CA"</div>
+                    
+                    <!-- Download Button (Moved Below Results) -->
+                    <div class="button-row" style="text-align: right; margin-top: 10px;">
+                        <button id="downloadBtn" onclick="downloadResults()" disabled>Download Directions & Map</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. Leaflet JavaScript for map functionality -->
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <!-- 3. html2canvas for map screenshot functionality -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script>
+        let intermediaryCount = 0;
+        let map = null; // Variable to hold the Leaflet map object
+        
+        function addIntermediary() {
+            const container = document.getElementById('intermediaryContainer');
+            const id = intermediaryCount++;
+            
+            const div = document.createElement('div');
+            div.className = 'location-item';
+            div.id = `intermediary-${id}`;
+            div.innerHTML = `
+                <label>Waypoint ${id + 1}:</label>
+                <input type="text" id="inter-${id}" placeholder="e.g., Hartford, CT">
+                <button class="remove-btn" onclick="removeIntermediary(${id})">Remove</button>
+                <div>
+                    <input type="checkbox" id="cond-${id}" onchange="toggleConditional(${id})">
+                    <label style="display: inline; margin-left: 5px;">Add conditional routing</label>
+                </div>
+                <div id="condSection-${id}" class="conditional-section" style="display: none;">
+                    <label>If travel time exceeds (minutes):</label>
+                    <input type="number" id="condTime-${id}" value="60" style="width: 80px;">
+                    <label>Use alternative location instead:</label>
+                    <input type="text" id="condAlt-${id}" placeholder="Alternative location">
+                </div>
+            `;
+            container.appendChild(div);
+        }
+        
+        function removeIntermediary(id) {
+            const elem = document.getElementById(`intermediary-${id}`);
+            if (elem) elem.remove();
+        }
+        
+        function toggleConditional(id) {
+            const checkbox = document.getElementById(`cond-${id}`);
+            const section = document.getElementById(`condSection-${id}`);
+            section.style.display = checkbox.checked ? 'block' : 'none';
+        }
+
+        function clearAll() {
+            document.getElementById('startLoc').value = '';
+            document.getElementById('endLoc').value = '';
+            document.getElementById('intermediaryContainer').innerHTML = '';
+            document.getElementById('results').innerHTML = 'Enter locations and click "Calculate Route" to see directions and travel time.';
+            document.getElementById('downloadBtn').disabled = true; 
+            intermediaryCount = 0;
+            
+            // Clear map
+            if (map) {
+                map.remove();
+                map = null;
+            }
+            document.getElementById('map').innerHTML = '';
+        }
+        
+        async function geocode(address) {
+            const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}`;
+            
+            // Exponential backoff mechanism for API calls
+            const maxRetries = 3;
+            let lastError = null;
+
+            for (let attempt = 0; attempt < maxRetries; attempt++) {
+                try {
+                    const response = await fetch(url, {
+                        headers: {
+                            // User-Agent is often required by Nominatim
+                            'User-Agent': 'GPS-Route-Planner-Canvas-App' 
+                        }
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error(`Geocoding failed with status: ${response.status}`);
+                    }
+                    
+                    const data = await response.json();
+                    if (data.length === 0) {
+                        throw new Error(`Could not find location: ${address}`);
+                    }
+                    return {
+                        lat: parseFloat(data[0].lat),
+                        lon: parseFloat(data[0].lon),
+                        display: data[0].display_name
+                    };
+                } catch (error) {
+                    lastError = error;
+                    if (attempt < maxRetries - 1) {
+                        // Wait (2^attempt) * 1000 milliseconds
+                        const delay = Math.pow(2, attempt) * 1000;
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                    }
+                }
+            }
+            throw lastError; // Re-throw the last error after retries fail
+        }
+        
+        async function getRoute(coords, profile) {
+            // Convert profile to OSRM format
+            const profileMap = {
+                'driving-car': 'car',
+                'foot-walking': 'foot',
+                'cycling-regular': 'bike'
+            };
+            const osrmProfile = profileMap[profile] || 'car';
+            
+            // Build coordinate string for OSRM
+            const coordStr = coords.map(c => `${c.lon},${c.lat}`).join(';');
+            const url = `https://router.project-osrm.org/route/v1/${osrmProfile}/${coordStr}?overview=full&geometries=geojson&steps=true`;
+            
+            const maxRetries = 3;
+            let lastError = null;
+
+            for (let attempt = 0; attempt < maxRetries; attempt++) {
+                try {
+                    const response = await fetch(url);
+                    
+                    if (!response.ok) {
+                        throw new Error(`Routing failed with status: ${response.statusText}`);
+                    }
+                    
+                    const data = await response.json();
+                    if (data.code !== 'Ok') {
+                        throw new Error(`OSRM Routing error: ${data.code}`);
+                    }
+                    return data;
+                } catch (error) {
+                    lastError = error;
+                    if (attempt < maxRetries - 1) {
+                        const delay = Math.pow(2, attempt) * 1000;
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                    }
+                }
+            }
+            throw lastError;
+        }
+        
+        function formatDuration(seconds) {
+            const hours = Math.floor(seconds / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            const parts = [];
+            if (hours > 0) {
+                parts.push(`${hours} hr`);
+            }
+            if (minutes > 0 || seconds < 60) {
+                // Show at least 1 minute if duration is less than an hour, or show minutes if hours are present
+                parts.push(`${minutes} min`);
+            }
+            return parts.join(' ');
+        }
+        
+        function formatDistance(meters) {
+            const miles = meters / 1609.34;
+            return miles.toFixed(1) + ' miles';
+        }
+        
+        function formatDirections(route, fromName, toName) {
+            const routeData = route.routes[0];
+            const duration = routeData.duration;
+            const distance = routeData.distance;
+            const steps = routeData.legs[0].steps;
+            
+            let output = `<div class="route-segment">`;
+            output += `<div class="route-header">From: ${fromName}</div>`;
+            output += `<div class="route-header">To: ${toName}</div>`;
+            output += `<div>Distance: ${formatDistance(distance)}</div>`;
+            output += `<div>Duration: ${formatDuration(duration)}</div>`;
+            output += `<div style="margin-top: 8px; font-weight: bold;">Directions:</div>`;
+            
+            steps.forEach((step, i) => {
+                if (step.maneuver) {
+                    const instruction = step.maneuver.instruction || step.name || 'Continue';
+                    const dist = step.distance || 0;
+                    output += `<div class="step">${i + 1}. ${instruction} (${formatDistance(dist)})</div>`;
+                }
+            });
+            
+            output += `</div>`;
+            return { output, duration };
+        }
+
+        // --- Map Functionality ---
+        function initMap(centerLat, centerLon) {
+            if (map) {
+                map.remove();
+            }
+            // Initialize map
+            map = L.map('map').setView([centerLat, centerLon], 10); 
+            
+            // Add OpenStreetMap tiles
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+                maxZoom: 19
+            }).addTo(map);
+
+            return map;
+        }
+
+        function drawRoute(map, route, color) {
+            if (!route || !route.routes || route.routes.length === 0) return [];
+
+            const geojson = route.routes[0].geometry;
+            // OSRM provides coordinates as [lon, lat], Leaflet needs [lat, lon]
+            const latLngs = geojson.coordinates.map(c => [c[1], c[0]]); 
+            
+            L.polyline(latLngs, {
+                color: color,
+                weight: 6,
+                opacity: 0.8,
+                lineCap: 'round'
+            }).addTo(map);
+
+            return latLngs;
+        }
+
+        function addMarker(map, lat, lon, label, color = 'blue') {
+            // Using Leaflet's built-in icon with customization
+            const customIcon = L.divIcon({
+                className: 'custom-div-icon',
+                html: `<div style="background-color:${color}; width:12px; height:12px; border-radius:50%; border:2px solid #333; box-shadow: 0 0 5px rgba(0,0,0,0.5);"></div>`,
+                iconSize: [12, 12],
+                iconAnchor: [6, 6], // Center the icon
+                popupAnchor: [0, -7] // Adjust popup position
+            });
+
+            const marker = L.marker([lat, lon], {icon: customIcon}).addTo(map);
+            marker.bindPopup(`<b>${label}</b>`).openPopup();
+            return marker;
+        }
+        // --- End Map Functionality ---
+
+        // --- Download Functionality (UPDATED) ---
+        async function downloadResults() {
+            // Ensure map object exists
+            if (!map) {
+                document.getElementById('results').innerHTML += '<div class="error" style="margin-top: 10px;">Cannot download map: Map has not been calculated yet.</div>';
+                return;
+            }
+
+            const downloadBtn = document.getElementById('downloadBtn');
+            downloadBtn.disabled = true;
+            const originalText = downloadBtn.textContent;
+            downloadBtn.textContent = 'Preparing downloads... (1/2 Text)';
+
+            let success = true;
+
+            // --- 1. Download Text Directions (.txt) ---
+            try {
+                const resultsDiv = document.getElementById('results');
+                const rawText = resultsDiv.innerText;
+                const filenameText = 'gps_route_directions.txt';
+                
+                const elementText = document.createElement('a');
+                elementText.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(rawText));
+                elementText.setAttribute('download', filenameText);
+                elementText.style.display = 'none';
+                document.body.appendChild(elementText);
+                
+                elementText.click();
+                document.body.removeChild(elementText);
+                downloadBtn.textContent = 'Preparing downloads... (2/2 Map)';
+
+            } catch (error) {
+                console.error("Failed to download text directions:", error);
+                document.getElementById('results').innerHTML += '<div class="error" style="margin-top: 5px;">Failed to create text file for download.</div>';
+                success = false;
+            }
+
+            // --- 2. Download Map Image (.png) ---
+            // Wait briefly to allow the first download to start processing
+            await new Promise(resolve => setTimeout(resolve, 500)); 
+
+            try {
+                const mapContainer = document.getElementById('map');
+                
+                // NOTE: Due to cross-origin security on map tiles (OpenStreetMap), 
+                // the generated image might sometimes appear blank or incomplete 
+                // because the tool cannot read the pixels from external domains.
+                const canvas = await html2canvas(mapContainer, {
+                    useCORS: true, 
+                    allowTaint: true, // Use allowTaint as a fallback if useCORS fails
+                    backgroundColor: '#ffffff'
+                });
+                
+                const imageDataUrl = canvas.toDataURL('image/png');
+                const filenameImage = 'gps_route_map.png';
+
+                const elementImage = document.createElement('a');
+                elementImage.setAttribute('href', imageDataUrl);
+                elementImage.setAttribute('download', filenameImage);
+                elementImage.style.display = 'none';
+                document.body.appendChild(elementImage);
+
+                elementImage.click();
+                document.body.removeChild(elementImage);
+
+            } catch (error) {
+                console.error("Failed to download map image:", error);
+                document.getElementById('results').innerHTML += '<div class="error" style="margin-top: 5px;">Map image download failed. Map tiles may be blank due to security restrictions.</div>';
+                success = false;
+            }
+            
+            // Restore button state
+            downloadBtn.textContent = originalText;
+            downloadBtn.disabled = false; 
+            if (success) {
+                 document.getElementById('results').innerHTML += '<div class="success" style="margin-top: 5px;">Download process initiated for both files. Check your downloads folder!</div>';
+            }
+        }
+        // --- End Download Functionality ---
+        
+        async function calculateRoute() {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<div><img src="https://placehold.co/20x20/c8c8c8/000?text=..." style="display:inline-block; margin-right:5px;"/>Calculating route...</div>';
+            document.getElementById('downloadBtn').disabled = true; 
+
+            if (map) {
+                map.remove();
+                map = null;
+            }
+            document.getElementById('map').innerHTML = ''; 
+
+            let allRouteLatLons = [];
+            let totalDuration = 0;
+            
+            try {
+                const startAddr = document.getElementById('startLoc').value.trim();
+                const endAddr = document.getElementById('endLoc').value.trim();
+                const mode = document.getElementById('travelMode').value;
+                
+                if (!startAddr || !endAddr) {
+                    throw new Error('Please enter both start and end locations.');
+                }
+                
+                // Geocode start and end
+                const startCoord = await geocode(startAddr);
+                const endCoord = await geocode(endAddr);
+                
+                // Collect intermediary points
+                const waypoints = [];
+                const container = document.getElementById('intermediaryContainer');
+                const interDivs = container.querySelectorAll('.location-item');
+                
+                for (const div of interDivs) {
+                    const id = div.id.split('-')[1];
+                    const addr = document.getElementById(`inter-${id}`).value.trim();
+                    if (addr) {
+                        const isConditional = document.getElementById(`cond-${id}`).checked;
+                        
+                        waypoints.push({
+                            address: addr,
+                            coord: null, // Will be geocoded later
+                            conditional: isConditional,
+                            maxTime: isConditional ? parseInt(document.getElementById(`condTime-${id}`).value) * 60 : null,
+                            altAddress: isConditional ? document.getElementById(`condAlt-${id}`).value.trim() : null
+                        });
+                    }
+                }
+
+                // 1. Compile the full list of locations (including geocoding waypoints)
+                let locations = [
+                    { coord: startCoord, name: startAddr, type: 'Start' }
+                ];
+                
+                // Geocode all waypoints upfront
+                for (const wp of waypoints) {
+                    try {
+                        wp.coord = await geocode(wp.address);
+                        locations.push({ ...wp, name: wp.address, type: 'Waypoint' });
+                    } catch (e) {
+                        // Skip this waypoint if geocoding failed, but log an error
+                        console.error(`Skipping waypoint "${wp.address}" due to geocoding error: ${e.message}`);
+                        resultsDiv.innerHTML += `<div class="error">Warning: Could not geocode waypoint "${wp.address}" and it was skipped.</div><br>`;
+                    }
+                }
+
+                locations.push({ coord: endCoord, name: endAddr, type: 'End' });
+
+                if (locations.length < 2) {
+                    throw new Error('Need at least two valid geocoded locations to calculate a route.');
+                }
+
+                // Initialize map with a center point (Start location)
+                map = initMap(startCoord.lat, startCoord.lon);
+
+                // 2. Calculate each segment
+                let output = '<div class="success">Route calculated successfully!</div><br>';
+                
+                for (let i = 0; i < locations.length - 1; i++) {
+                    const from = locations[i];
+                    const to = locations[i + 1];
+                    
+                    let route = await getRoute([from.coord, to.coord], mode);
+                    let { output: segOutput, duration } = formatDirections(route, from.name, to.name);
+                    let routeCoords;
+
+                    // Check conditional routing on the destination (the 'to' location)
+                    if (to.conditional && to.maxTime && duration > to.maxTime) {
+                        output += `<div class="error">⚠ Travel time (${formatDuration(duration)}) exceeds limit (${formatDuration(to.maxTime)})</div>`;
+                        
+                        if (to.altAddress) {
+                            output += `<div style="font-weight: bold;">Recalculating via alternative: ${to.altAddress}</div><br>`;
+                            
+                            const altCoord = await geocode(to.altAddress);
+                            const altRoute = await getRoute([from.coord, altCoord], mode);
+                            const { output: altOutput, duration: altDuration } = formatDirections(altRoute, from.name, to.altAddress);
+                            
+                            output += altOutput;
+                            totalDuration += altDuration;
+                            
+                            // Draw alternative route (Red line for conditional path)
+                            routeCoords = drawRoute(map, altRoute, '#c00000'); 
+                            allRouteLatLons.push(...routeCoords);
+
+                            // IMPORTANT: Update the 'to' location in the array for subsequent segments
+                            locations[i + 1].coord = altCoord;
+                            locations[i + 1].name = to.altAddress;
+                            locations[i + 1].type = 'Alternative';
+
+                        } else {
+                             // If conditional failed but no alt address provided, use original route
+                             output += `<div style="font-weight: bold;">Alternative location not provided. Using original route.</div><br>`;
+                             output += segOutput;
+                             totalDuration += duration;
+                             routeCoords = drawRoute(map, route, '#0054a6');
+                             allRouteLatLons.push(...routeCoords);
+                        }
+                    } else {
+                        // Standard route
+                        output += segOutput;
+                        totalDuration += duration;
+                        routeCoords = drawRoute(map, route, '#0054a6'); // Blue line for standard path
+                        allRouteLatLons.push(...routeCoords);
+                    }
+                }
+
+                // 3. Add markers for all points after final location compilation
+                locations.forEach((loc, index) => {
+                    let markerColor;
+                    let label = `${loc.type}: ${loc.name}`;
+                    
+                    if (index === 0) markerColor = '#008000'; // Dark Green for Start
+                    else if (index === locations.length - 1) markerColor = '#c00000'; // Dark Red for End
+                    else if (loc.type === 'Alternative') markerColor = '#ff8c00'; // Orange for Alternative
+                    else markerColor = '#0054a6'; // Blue for Waypoint
+                    
+                    addMarker(map, loc.coord.lat, loc.coord.lon, label, markerColor);
+                });
+
+                // 4. Fit the map view to the entire route
+                if (allRouteLatLons.length > 0) {
+                    const bounds = L.latLngBounds(allRouteLatLons);
+                    map.fitBounds(bounds, { padding: [40, 40] }); 
+                }
+                
+                output = `<div style="font-weight: bold; margin-bottom: 10px;">TOTAL TRAVEL TIME: ${formatDuration(totalDuration)}</div>` + output;
+                resultsDiv.innerHTML = output;
+                document.getElementById('downloadBtn').disabled = false; 
+                
+            } catch (error) {
+                resultsDiv.innerHTML = `<div class="error">Error during calculation: ${error.message}</div>`;
+                document.getElementById('downloadBtn').disabled = true;
+                // Log detailed error to console
+                console.error("GPS Route Calculation Failed:", error);
+            }
+        }
+    </script>
+</body>
+</html>
