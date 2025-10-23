@@ -1,0 +1,2313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minimalist Pages</title>
+    <!-- Load necessary libraries for PDF generation (html2canvas and jsPDF) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <!-- Load JSZip library for creating zip files -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    
+    <style>
+        /* All CSS remains the same as before - no changes needed */
+        :root {
+            --background-color: #f7f3e8; 
+            --divider-color: #000;
+            --text-color: #333;
+            --accent-color: #c0c0c0;
+            --font-family: 'Times New Roman', Times, serif; 
+            --progress-color: #d4af37;
+            --progress-complete-color: #4CAF50;
+        }
+
+        body.dark-mode {
+            --background-color: #1a1a1a;
+            --divider-color: #444;
+            --text-color: #ccc;
+            --accent-color: #333;
+            color: var(--text-color);
+        }
+
+        body {
+            background-color: var(--background-color);
+            margin: 0;
+            font-family: var(--font-family);
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+            font-size: 14px;
+            color: var(--text-color);
+            transition: background-color 0.3s;
+        }
+
+        #sidebar {
+            width: 250px;
+            padding: 20px 0;
+            border-right: 1px solid var(--divider-color);
+            overflow-y: auto;
+            flex-shrink: 0;
+            transition: border-color 0.3s;
+            position: relative;
+            overflow-x: hidden;
+        }
+        
+        /* Resizer element */
+        #sidebar-resizer {
+            position: absolute;
+            top: 0;
+            right: -5px;
+            width: 10px;
+            height: 100%;
+            cursor: col-resize;
+            z-index: 10;
+        }
+        
+        #sidebar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 15px;
+            margin-bottom: 20px;
+        }
+
+        #app-title {
+            font-size: 1.2em;
+            font-weight: 600;
+        }
+
+        #top-right-controls button, #sidebar button, #download-modal button, #context-menu button, #word-count-modal button {
+            background-color: var(--accent-color); 
+            color: var(--text-color);
+            border: 1px solid var(--divider-color);
+            border-right: 2px solid #555;
+            border-bottom: 2px solid #555;
+            padding: 4px 10px;
+            cursor: pointer;
+            font-size: 0.85em;
+            font-weight: normal;
+            box-shadow: none;
+            transition: background-color 0.1s, border-color 0.3s, color 0.3s;
+            font-family: inherit;
+        }
+        
+        #new-page-btn-sidebar {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 1.5em;
+            color: var(--text-color);
+            line-height: 1;
+            padding: 0;
+            margin: 0;
+            transition: color 0.3s;
+        }
+        
+        #new-page-btn-sidebar:hover {
+            color: var(--divider-color);
+        }
+
+        #top-right-controls button:hover, #sidebar button:hover, #download-modal button:hover, #context-menu button:hover, #word-count-modal button:hover {
+            background-color: #d0d0d0;
+        }
+        
+        body.dark-mode #top-right-controls button, body.dark-mode #sidebar button, body.dark-mode #download-modal button, body.dark-mode #context-menu button, body.dark-mode #word-count-modal button {
+            border-right: 2px solid #888;
+            border-bottom: 2px solid #888;
+        }
+        body.dark-mode #top-right-controls button:hover, body.dark-mode #sidebar button:hover, body.dark-mode #download-modal button:hover, body.dark-mode #context-menu button:hover, body.dark-mode #word-count-modal button:hover {
+            background-color: #444;
+        }
+
+        #top-right-controls button:active, #sidebar button:active, #download-modal button:active, #context-menu button:active, #word-count-modal button:active {
+            border: 2px solid #555; 
+            border-right: 1px solid var(--divider-color); 
+            border-bottom: 1px solid var(--divider-color); 
+            padding: 4px 10px;
+            margin-left: 1px;
+            margin-top: 1px;
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            box-shadow: none;
+            border-right: 1px solid var(--divider-color) !important;
+            border-bottom: 1px solid var(--divider-color) !important;
+        }
+
+        #page-list {
+            list-style: none;
+            padding: 0 15px;
+            margin: 0;
+        }
+
+        .list-item-container {
+            margin-bottom: 0px;
+            transition: opacity 0.2s;
+        }
+        
+        .page-link, .folder-title {
+            display: block;
+            color: var(--text-color);
+            text-decoration: none;
+            font-size: 0.95em;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: flex;
+            align-items: center;
+            cursor: pointer !important; 
+            position: relative; 
+        }
+
+        .list-item-container[draggable="true"] {
+            cursor: pointer;
+        }
+        
+        .page-link > .item-name, .folder-title > .item-name {
+            display: block;
+            padding: 5px 8px;
+            flex-grow: 1;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .page-link:hover > .item-name, .folder-title:hover > .item-name {
+            background-color: var(--accent-color);
+            border: 1px solid var(--divider-color); 
+            margin: -1px; 
+        }
+
+        .page-link.active > .item-name {
+            font-weight: bold;
+            background-color: var(--accent-color);
+        }
+
+        .folder-title {
+            font-weight: 600;
+        }
+        
+        .folder-title.open .folder-toggle {
+            transform: rotate(90deg);
+        }
+        
+        body.dark-mode .folder-toggle {
+             color: var(--text-color);
+        }
+
+        .folder-toggle {
+            margin-right: 5px;
+            transition: transform 0.2s;
+            font-size: 0.8em;
+            color: var(--text-color);
+            cursor: pointer;
+            width: 10px;
+            display: inline-block;
+        }
+
+        .folder-content {
+            padding-left: 15px;
+            display: none;
+            list-style: none;
+            margin: 0;
+        }
+
+        .folder-content.open {
+            display: block;
+        }
+
+        .editable-title-temp {
+            border: 1px solid var(--divider-color);
+            background: var(--background-color); 
+            font-family: inherit;
+            font-size: inherit;
+            color: var(--text-color);
+            padding: 5px 8px; 
+            margin: 0; 
+            flex-grow: 1; 
+            box-sizing: border-box;
+            outline: none;
+            display: block !important; 
+        }
+        
+        #context-menu {
+            position: fixed;
+            background-color: var(--background-color);
+            border: 2px outset var(--accent-color);
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.3);
+            z-index: 1000;
+            display: none;
+            flex-direction: column;
+            min-width: 150px;
+        }
+
+        #context-menu button {
+            text-align: left;
+            padding: 8px 12px;
+            border: none;
+            border-bottom: 1px solid var(--divider-color);
+            background: none;
+            width: 100%;
+            border-radius: 0;
+        }
+
+        #context-menu button:last-child {
+            border-bottom: none;
+        }
+
+        #context-menu button:hover {
+            background-color: var(--accent-color);
+        }
+
+        #main-content {
+            flex-grow: 1;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            overflow-y: auto;
+        }
+
+        #top-right-controls {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 10;
+            display: flex;
+            gap: 10px;
+        }
+
+        #page-editor-container {
+            max-width: 800px;
+            width: 100%;
+            margin: 0 auto;
+            padding-top: 60px; 
+            display: flex;
+            flex-direction: column;
+            flex-grow: 1;
+        }
+
+        #page-content {
+            min-height: 400px;
+            flex-grow: 1;
+            width: 100%;
+            border: none;
+            background: transparent;
+            font-size: 1.1em;
+            line-height: 1.6;
+            font-family: inherit;
+            cursor: text;
+            color: var(--text-color);
+            transition: color 0.3s;
+        }
+
+        #page-content:focus {
+            outline: none;
+        }
+        
+        #page-content img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin: 10px 0;
+            border: 1px solid var(--divider-color);
+            transition: border-color 0.3s;
+            cursor: move;
+            resize: both;
+            overflow: auto;
+            min-width: 50px;
+            min-height: 50px;
+            max-width: 100%;
+            display: inline-block;
+        }
+        
+        #page-content img.dragging {
+            opacity: 0.5;
+        }
+        
+        /* Image resize handles */
+        .image-resize-handle {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background-color: #fff;
+            border: 1px solid #000;
+            z-index: 100;
+            pointer-events: all;
+            display: none;
+        }
+        
+        .image-wrapper.selected .image-resize-handle {
+            display: block;
+        }
+        
+        .image-resize-handle.top-left {
+            top: -5px;
+            left: -5px;
+            cursor: nw-resize;
+        }
+        
+        .image-resize-handle.top-right {
+            top: -5px;
+            right: -5px;
+            cursor: ne-resize;
+        }
+        
+        .image-resize-handle.bottom-left {
+            bottom: -5px;
+            left: -5px;
+            cursor: sw-resize;
+        }
+        
+        .image-resize-handle.bottom-right {
+            bottom: -5px;
+            right: -5px;
+            cursor: se-resize;
+        }
+        
+        .image-wrapper {
+            display: inline-block;
+            position: relative;
+            margin: 10px 0;
+        }
+        
+        .image-wrapper.selected {
+            outline: 2px solid #0066cc;
+        }
+        
+        #text-context-menu {
+            position: fixed;
+            background-color: var(--background-color);
+            border: 2px outset var(--accent-color);
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.3);
+            z-index: 1000;
+            display: none;
+            flex-direction: row;
+            min-width: 150px;
+            padding: 5px;
+            gap: 2px;
+        }
+
+        #text-context-menu button {
+            text-align: center;
+            padding: 8px 10px;
+            border: 1px solid var(--divider-color);
+            background: none;
+            border-radius: 0;
+            flex: 1;
+            min-width: 30px;
+            color: var(--text-color);
+        }
+
+        #image-context-menu {
+            position: fixed;
+            background-color: var(--background-color);
+            border: 2px outset var(--accent-color);
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.3);
+            z-index: 1000;
+            display: none;
+            flex-direction: row;
+            min-width: 150px;
+            padding: 5px;
+            gap: 2px;
+        }
+
+        #image-context-menu button {
+            text-align: center;
+            padding: 8px 10px;
+            border: 1px solid var(--divider-color);
+            background: none;
+            border-radius: 0;
+            flex: 1;
+            min-width: 30px;
+            color: var(--text-color);
+        }
+
+        .underline {
+            text-decoration: underline;
+        }
+        
+        .italic {
+            font-style: italic;
+        }
+        
+        .quote {
+            border-left: 3px solid #0066cc;
+            padding-left: 10px;
+            margin-left: 5px;
+        }
+        
+        .dotted-list {
+            list-style-type: disc;
+            padding-left: 20px;
+        }
+        
+        .numbered-list {
+            list-style-type: decimal;
+            padding-left: 20px;
+        }
+        
+        #download-controls button {
+            background-color: var(--accent-color); 
+            color: var(--text-color);
+            border: 1px solid var(--divider-color);
+            border-right: 2px solid #555;
+            border-bottom: 2px solid #555;
+            padding: 4px 10px;
+            cursor: pointer;
+            font-size: 0.85em;
+            font-weight: normal;
+            box-shadow: none;
+            transition: background-color 0.1s, border-color 0.3s, color 0.3s;
+            font-family: inherit;
+            width: 100%;
+            margin-bottom: 5px;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+        
+        #pdf-export-content {
+            position: fixed !important;
+            top: 0 !important;
+            left: 100vw !important; 
+            z-index: -1 !important;
+            width: 800px;
+            max-width: 210mm;
+            padding: 20px;
+            background-color: #ffffff;
+            color: #000000;
+            box-sizing: border-box;
+            font-family: var(--font-family);
+            line-height: 1.6;
+        }
+        
+        #pdf-export-content h1 { font-size: 1.5em; margin: 0 0 10px 0; }
+        #pdf-export-content h2 { font-size: 1.2em; margin: 15px 0 5px 0; border-bottom: 1px solid #ccc; padding-bottom: 3px; }
+        #pdf-export-content p { margin: 0 0 10px 0; }
+        #pdf-export-content img { max-width: 100%; height: auto; display: block; margin: 10px 0; border: 1px solid #000; }
+
+        #pdf-loading {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: var(--background-color);
+            border: 2px solid var(--divider-color);
+            padding: 20px;
+            z-index: 1001;
+            display: none;
+        }
+
+        #download-modal-overlay, #word-count-modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        #download-modal, #word-count-modal {
+            background-color: var(--background-color);
+            border: 3px outset var(--accent-color);
+            padding: 20px;
+            width: 300px;
+            max-width: 90%;
+            box-shadow: 4px 4px 0 #000; 
+        }
+
+        #download-modal h3, #word-count-modal h3 {
+            margin-top: 0;
+            border-bottom: 1px solid var(--divider-color);
+            padding-bottom: 10px;
+            font-size: 1.2em;
+        }
+
+        .modal-section {
+            margin-bottom: 15px;
+            padding: 10px 0;
+            border-bottom: 1px dashed var(--divider-color);
+        }
+
+        .modal-section h4 {
+            margin: 0 0 8px 0;
+            font-size: 1em;
+            font-weight: bold;
+        }
+
+        .modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        #word-counter {
+            position: fixed;
+            bottom: 10px;
+            right: 25px;
+            font-size: 0.7em;
+            color: var(--text-color);
+            opacity: 0.7;
+            cursor: pointer;
+            transition: opacity 0.3s;
+            z-index: 100;
+        }
+
+        #word-counter:hover {
+            opacity: 1;
+        }
+
+        #word-count-progress {
+            position: fixed;
+            right: 0;
+            bottom: 0;
+            width: 5px;
+            height: 0;
+            background-color: var(--progress-color);
+            transition: height 0.3s, background-color 0.3s;
+            z-index: 99;
+        }
+
+        #word-count-progress.complete {
+            background-color: var(--progress-complete-color);
+        }
+
+        @media (max-width: 600px) {
+            #sidebar {
+                width: 180px;
+                padding: 10px 0;
+            }
+            #sidebar-header {
+                padding: 0 10px;
+            }
+            #main-content {
+                padding: 10px;
+            }
+            #page-editor-container {
+                padding-top: 50px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 1. Left Section (Page Navigation/Sidebar) -->
+    <div id="sidebar" ondragover="handleRootDragOver(event)" ondragleave="handleRootDragLeave(event)" ondrop="handleRootDrop(event)">
+        <div id="sidebar-resizer"></div>
+        <div id="sidebar-header">
+            <span id="app-title">Organization</span>
+            <button id="new-page-btn-sidebar" title="New Page">+</button>
+        </div>
+        
+        <ul id="page-list">
+            <!-- Navigation links will be inserted here by JavaScript -->
+        </ul>
+        
+        <div style="padding: 15px;">
+            <button onclick="createFolder()">+ New Folder</button>
+        </div>
+        
+        <!-- DOWNLOAD CONTROLS (NEW LOCATION) -->
+        <div id="download-controls" style="padding: 15px; border-top: 1px solid var(--divider-color); margin-top: 20px; padding-bottom: 5px;">
+            <p style="font-weight: bold; margin-top: 0; margin-bottom: 10px; font-size: 1em;">Export Documents</p>
+            <button id="download-page-btn" onclick="showDownloadOptions('page')" disabled>Download Page</button>
+            <button id="download-folder-btn" onclick="showDownloadOptions('folder')" disabled>Download Folder</button>
+            <button id="download-all-btn" onclick="showDownloadOptions('all')">Download All</button>
+        </div>
+        <!-- END DOWNLOAD CONTROLS -->
+    </div>
+
+    <!-- 2. Right Section (Main Content/Editor) -->
+    <div id="main-content">
+
+        <!-- Top Right Button -->
+        <div id="top-right-controls">
+            <button id="theme-toggle-btn">Black/White Theme</button>
+            <button id="new-page-btn-top">New Page</button>
+        </div>
+
+        <!-- Page Editor and Controls Container -->
+        <div id="page-editor-container">
+            <div id="page-content" contenteditable="true"></div>
+        </div>
+    </div>
+
+    <!-- 3. Download Options Modal -->
+    <div id="download-modal-overlay" class="hidden">
+        <div id="download-modal">
+            <h3>Download Options</h3>
+            <div class="modal-section">
+                <h4>Content Type</h4>
+                <label>
+                    <input type="radio" name="content_type" value="text" checked> Text only
+                </label><br>
+                <label>
+                    <input type="radio" name="content_type" value="text_with_images"> Text with images (PDF only)
+                </label>
+            </div>
+            
+            <div class="modal-section">
+                <h4>Format</h4>
+                <label>
+                    <input type="radio" name="format_type" value="txt" checked> TXT Document
+                </label><br>
+                <label>
+                    <input type="radio" name="format_type" value="pdf"> PDF Document
+                </label>
+                <label id="zip-option-label" class="hidden">
+                    <input type="radio" name="format_type" value="zip"> ZIP Folder (Text only)
+                </label>
+            </div>
+            
+            <div class="modal-actions">
+                <button onclick="handleDownload()">OK</button>
+                <button onclick="document.getElementById('download-modal-overlay').classList.add('hidden')">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 4. Context Menu -->
+    <div id="context-menu">
+        <button id="context-rename">Rename</button>
+        <button id="context-move-to-root">Move to Root</button>
+        <button id="context-delete">Delete</button>
+    </div>
+
+    <!-- 5. Text Context Menu -->
+    <div id="text-context-menu">
+        <button id="text-link">🔗</button>
+        <button id="text-underline">U̲</button>
+        <button id="text-italic">I</button>
+        <button id="text-quote">❝</button>
+        <button id="text-dotted-list">•</button>
+        <button id="text-numbered-list">1.</button>
+    </div>
+
+    <!-- 6. Image Context Menu -->
+    <div id="image-context-menu">
+        <button id="image-align-left">◀</button>
+        <button id="image-align-center">●</button>
+        <button id="image-align-right">▶</button>
+    </div>
+
+    <!-- 8. Word Count Modal -->
+    <div id="word-count-modal-overlay" class="hidden">
+        <div id="word-count-modal">
+            <h3>Word Count Goal</h3>
+            <div class="modal-section">
+                <h4>Set Word Count Goal</h4>
+                <input type="number" id="word-count-goal" min="1" value="500" style="width: 100%; padding: 5px; margin-bottom: 10px;">
+                <div>
+                    <label>
+                        <input type="radio" name="word-count-scope" value="page" checked> Current Page
+                    </label><br>
+                    <label>
+                        <input type="radio" name="word-count-scope" value="folder"> Current Folder
+                    </label><br>
+                    <label>
+                        <input type="radio" name="word-count-scope" value="all"> All Pages
+                    </label>
+                </div>
+            </div>
+            
+            <div class="modal-actions">
+                <button onclick="setWordCountGoal()">OK</button>
+                <button onclick="document.getElementById('word-count-modal-overlay').classList.add('hidden')">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 9. Temporary PDF Content Container (Off-screen but rendered) -->
+    <div id="pdf-export-content" class="hidden"></div>
+    
+    <!-- 10. PDF Loading Indicator -->
+    <div id="pdf-loading">
+        <p>Generating PDF with images... This may take a moment.</p>
+    </div>
+
+    <!-- 11. Word Counter and Progress Bar -->
+    <div id="word-counter" onclick="toggleWordCountModal()">Words: 0</div>
+    <div id="word-count-progress"></div>
+
+    <script>
+        // Use a key for local storage
+        const STORAGE_KEY = 'minimalistPagesApp_data';
+        const THEME_KEY = 'minimalistPagesApp_theme';
+        const WORD_COUNT_KEY = 'minimalistPagesApp_wordCount';
+        const SIDEBAR_WIDTH_KEY = 'minimalistPagesApp_sidebarWidth';
+        
+        // State variables
+        let appData = { pages: [], activePageId: null };
+        let nextId = 1;
+        let currentDownloadTarget = null;
+        let contextMenuTargetId = null;
+        let selectedImage = null;
+        let wordCountGoal = null;
+        let wordCountScope = 'page';
+        let isDraggingImage = false;
+        let isResizingImage = false;
+        let resizeHandle = null;
+        let originalWidth = 0;
+        let originalHeight = 0;
+        let originalAspectRatio = 0;
+        let originalMouseX = 0;
+        let originalMouseY = 0;
+        
+        // Sidebar resizing variables
+        let isResizingSidebar = false;
+        let sidebarResizer = document.getElementById('sidebar-resizer');
+        let sidebar = document.getElementById('sidebar');
+
+        // --- DOM Elements ---
+        const pageList = document.getElementById('page-list');
+        const pageContentInput = document.getElementById('page-content');
+        const newPageBtnTop = document.getElementById('new-page-btn-top');
+        const newPageBtnSidebar = document.getElementById('new-page-btn-sidebar');
+        const themeToggleBtn = document.getElementById('theme-toggle-btn');
+        const downloadPageBtn = document.getElementById('download-page-btn');
+        const downloadFolderBtn = document.getElementById('download-folder-btn');
+        const pdfExportContent = document.getElementById('pdf-export-content');
+        const pdfLoading = document.getElementById('pdf-loading');
+        const contextMenu = document.getElementById('context-menu');
+        const contextRenameBtn = document.getElementById('context-rename');
+        const contextMoveToRootBtn = document.getElementById('context-move-to-root');
+        const contextDeleteBtn = document.getElementById('context-delete');
+        const textContextMenu = document.getElementById('text-context-menu');
+        const textLinkBtn = document.getElementById('text-link');
+        const textUnderlineBtn = document.getElementById('text-underline');
+        const textItalicBtn = document.getElementById('text-italic');
+        const textQuoteBtn = document.getElementById('text-quote');
+        const textDottedListBtn = document.getElementById('text-dotted-list');
+        const textNumberedListBtn = document.getElementById('text-numbered-list');
+        const imageContextMenu = document.getElementById('image-context-menu');
+        const imageAlignLeftBtn = document.getElementById('image-align-left');
+        const imageAlignCenterBtn = document.getElementById('image-align-center');
+        const imageAlignRightBtn = document.getElementById('image-align-right');
+        const wordCounter = document.getElementById('word-counter');
+        const wordCountProgress = document.getElementById('word-count-progress');
+        const zipOptionLabel = document.getElementById('zip-option-label');
+        
+        // --- Initialization and Data Management ---
+
+        function loadData() {
+            const storedData = localStorage.getItem(STORAGE_KEY);
+            if (storedData) {
+                try {
+                    appData = JSON.parse(storedData);
+                    
+                    if (!appData.pages || !Array.isArray(appData.pages)) {
+                        appData = { pages: [], activePageId: null };
+                    }
+
+                    function findMaxId(items) {
+                        let max = 0;
+                        items.forEach(item => {
+                            if (item && typeof item.id === 'number') {
+                                max = Math.max(max, item.id);
+                                if (item.type === 'folder' && item.children && Array.isArray(item.children)) {
+                                    max = Math.max(max, findMaxId(item.children));
+                                }
+                            }
+                        });
+                        return max;
+                    }
+                    nextId = findMaxId(appData.pages) + 1;
+                    
+                    if (!appData.activePageId && appData.pages.length > 0) {
+                        appData.activePageId = findFirstPageId(appData.pages);
+                    }
+                } catch (error) {
+                    console.error("Error parsing stored data, resetting:", error);
+                    appData = { pages: [], activePageId: null };
+                    createPage('Welcome Page', 'Select or create a new page on the top right corner. Once you have written on the page, you can organize it into different files in the "Organization" section in the top left side of the screen.<br><br>If you wish to download the contents, use the options in the "Export Document" section. <br><br> More advance features may be used by either highlighting the image/text content, or by clicking the word counter in the bottom right corner.');
+                }
+            } else {
+                createPage('Welcome Page', 'Select or create a new page on the top right corner. Once you have written on the page, you can organize it into different files in the "Organization" section in the top left side of the screen.<br><br>If you wish to download the contents, use the options in the "Export Document" section. <br><br> More advance features may be used by either highlighting the image/text content, or by clicking the word counter in the bottom right corner.');
+            }
+            renderSidebar();
+            loadActivePage();
+            
+            const wordCountSettings = localStorage.getItem(WORD_COUNT_KEY);
+            if (wordCountSettings) {
+                try {
+                    const settings = JSON.parse(wordCountSettings);
+                    wordCountGoal = settings.goal;
+                    wordCountScope = settings.scope || 'page';
+                    updateWordCount();
+                    updateWordCountProgress();
+                } catch (error) {
+                    console.error("Error parsing word count settings:", error);
+                }
+            }
+            
+            // Load saved sidebar width
+            const savedSidebarWidth = localStorage.getItem(SIDEBAR_WIDTH_KEY);
+            if (savedSidebarWidth) {
+                sidebar.style.width = savedSidebarWidth;
+            }
+        }
+
+        function findFirstPageId(items) {
+            for (const item of items) {
+                if (item && item.type === 'page') {
+                    return item.id;
+                }
+                if (item && item.type === 'folder' && item.children && Array.isArray(item.children) && item.children.length > 0) {
+                    const firstPage = findFirstPageId(item.children);
+                    if (firstPage) return firstPage;
+                }
+            }
+            return null;
+        }
+
+        function saveData() {
+            try {
+                const dataToSave = JSON.parse(JSON.stringify(appData));
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(dataToSave));
+            } catch (error) {
+                console.error("Error saving data to local storage:", error);
+            }
+        }
+
+        // --- Sidebar Resizing Functions ---
+
+        function startResizeSidebar(e) {
+            isResizingSidebar = true;
+            document.addEventListener('mousemove', resizeSidebar);
+            document.addEventListener('mouseup', stopResizeSidebar);
+            e.preventDefault();
+        }
+
+        function resizeSidebar(e) {
+            if (!isResizingSidebar) return;
+            
+            const newWidth = e.clientX;
+            const minWidth = 180;
+            const maxWidth = window.innerWidth - 200;
+            
+            if (newWidth >= minWidth && newWidth <= maxWidth) {
+                sidebar.style.width = `${newWidth}px`;
+            }
+        }
+
+        function stopResizeSidebar() {
+            isResizingSidebar = false;
+            document.removeEventListener('mousemove', resizeSidebar);
+            document.removeEventListener('mouseup', stopResizeSidebar);
+            
+            // Save the sidebar width
+            localStorage.setItem(SIDEBAR_WIDTH_KEY, sidebar.style.width);
+        }
+
+        // --- Core Page Functions ---
+
+        function findPageById(id, items = appData.pages) {
+            if (!Array.isArray(items)) return null;
+            
+            for (const item of items) {
+                if (item && item.id === id && item.type === 'page') {
+                    return item;
+                }
+                if (item && item.type === 'folder' && item.children && Array.isArray(item.children)) {
+                    const found = findPageById(id, item.children);
+                    if (found) return found;
+                }
+            }
+            return null;
+        }
+        
+        function findItemPath(targetId, items = appData.pages, parentId = null) {
+            if (!Array.isArray(items)) return { item: null, parentId: null, parentChildren: null };
+            
+            for (const item of items) {
+                if (item && item.id === targetId) {
+                    return { item, parentId, parentChildren: items };
+                }
+                if (item && item.type === 'folder' && item.children && Array.isArray(item.children)) {
+                    const result = findItemPath(targetId, item.children, item.id);
+                    if (result.item) {
+                        return result;
+                    }
+                }
+            }
+            return { item: null, parentId: null, parentChildren: null };
+        }
+
+        function createPage(name = 'Untitled Page', content = '') {
+            const newPage = {
+                id: nextId++,
+                name: name,
+                content: content,
+                type: 'page'
+            };
+            
+            appData.pages.push(newPage);
+            
+            appData.activePageId = newPage.id;
+            saveData();
+            renderSidebar();
+            loadActivePage();
+        }
+
+        function loadActivePage() {
+            const page = findPageById(appData.activePageId);
+            
+            pageContentInput.oninput = null;
+            pageContentInput.onpaste = null;
+
+            if (page) {
+                pageContentInput.innerHTML = page.content; 
+                pageContentInput.oninput = function() { 
+                    updatePageContent(page.id, this.innerHTML);
+                    updateWordCount();
+                    updateWordCountProgress();
+                };
+                pageContentInput.onpaste = handleImagePaste;
+                pageContentInput.contentEditable = 'true';
+                
+                downloadPageBtn.disabled = false;
+                
+                // Check if there are any folders to download
+                const hasFolders = appData.pages.some(item => item.type === 'folder');
+                downloadFolderBtn.disabled = !hasFolders;
+
+            } else {
+                pageContentInput.innerHTML = 'Select or create a new page on the top right corner. Once you have written on the page, you can organize it into different files in the "Organization" section in the top left side of the screen.<br><br>If you wish to download the contents, use the options in the "Export Document" section. <br><br> More advance features may be used by either highlighting the image/text content, or by clicking the word counter in the bottom right corner.';
+                pageContentInput.contentEditable = 'false';
+                
+                downloadPageBtn.disabled = true;
+                downloadFolderBtn.disabled = true;
+            }
+            
+            document.title = page ? `${page.name} - Organization` : 'Organization';
+            
+            updateWordCount();
+            updateWordCountProgress();
+            
+            // Add resize handles to all images
+            addResizeHandlesToImages();
+        }
+
+        function updatePageContent(pageId, content) {
+            const page = findPageById(pageId);
+            if (page) {
+                page.content = content;
+                saveData();
+            }
+        }
+
+        // --- Sidebar Rendering and Navigation ---
+
+        function renderSidebar() {
+            pageList.innerHTML = '';
+            
+            function renderItems(items, parentId = null) {
+                const ul = parentId ? document.createElement('ul') : pageList;
+                if (parentId) {
+                    ul.className = 'folder-content';
+                    ul.id = `folder-content-${parentId}`;
+                    
+                    // Check if the folder should be open
+                    const folder = findItemById(parentId);
+                    if (folder && folder.open) {
+                        ul.classList.add('open');
+                    }
+                }
+                
+                items.forEach(item => {
+                    if (!item) return;
+                    
+                    const li = document.createElement('li');
+                    li.className = 'list-item-container';
+                    li.id = `item-${item.id}`;
+                    li.draggable = true;
+                    
+                    // Add all drag and drop event listeners
+                    li.addEventListener('dragstart', (e) => handleDragStart(e, item.id));
+                    li.addEventListener('dragover', handleDragOver);
+                    li.addEventListener('dragleave', handleDragLeave);
+                    li.addEventListener('drop', (e) => handleDrop(e, item.id));
+                    li.addEventListener('dragend', resetDragState);
+                    li.addEventListener('contextmenu', (e) => showContextMenu(e, item.id));
+                    
+                    if (item.type === 'page') {
+                        const link = document.createElement('a');
+                        link.className = 'page-link';
+                        if (item.id === appData.activePageId) {
+                            link.classList.add('active');
+                        }
+                        
+                        const nameSpan = document.createElement('span');
+                        nameSpan.className = 'item-name';
+                        nameSpan.textContent = item.name;
+                        nameSpan.addEventListener('dblclick', () => startRenaming(item.id));
+                        
+                        link.appendChild(nameSpan);
+                        link.addEventListener('click', (e) => {
+                            if (e.target === link || e.target === nameSpan) {
+                                e.preventDefault();
+                                appData.activePageId = item.id;
+                                saveData();
+                                renderSidebar();
+                                loadActivePage();
+                            }
+                        });
+                        
+                        li.appendChild(link);
+                    } else if (item.type === 'folder') {
+                        const folderDiv = document.createElement('div');
+                        folderDiv.className = 'folder-title';
+                        if (item.open) {
+                            folderDiv.classList.add('open');
+                        }
+                        
+                        const toggleSpan = document.createElement('span');
+                        toggleSpan.className = 'folder-toggle';
+                        toggleSpan.innerHTML = '▶';
+                        toggleSpan.addEventListener('click', () => toggleFolder(item.id));
+                        
+                        const nameSpan = document.createElement('span');
+                        nameSpan.className = 'item-name';
+                        nameSpan.textContent = item.name;
+                        nameSpan.addEventListener('dblclick', () => startRenaming(item.id));
+                        
+                        folderDiv.appendChild(toggleSpan);
+                        folderDiv.appendChild(nameSpan);
+                        li.appendChild(folderDiv);
+                        
+                        if (item.children && Array.isArray(item.children)) {
+                            const childrenUl = renderItems(item.children, item.id);
+                            li.appendChild(childrenUl);
+                        }
+                    }
+                    
+                    if (parentId) {
+                        ul.appendChild(li);
+                    } else {
+                        pageList.appendChild(li);
+                    }
+                });
+                
+                return ul;
+            }
+            
+            renderItems(appData.pages);
+        }
+
+        function findItemById(id, items = appData.pages) {
+            if (!Array.isArray(items)) return null;
+            
+            for (const item of items) {
+                if (item && item.id === id) {
+                    return item;
+                }
+                if (item && item.type === 'folder' && item.children && Array.isArray(item.children)) {
+                    const found = findItemById(id, item.children);
+                    if (found) return found;
+                }
+            }
+            return null;
+        }
+
+        function toggleFolder(folderId) {
+            const folder = findItemById(folderId);
+            if (folder) {
+                folder.open = !folder.open;
+                saveData();
+                renderSidebar();
+            }
+        }
+
+        // --- Folder Management ---
+
+        function createFolder() {
+            const newFolder = {
+                id: nextId++,
+                name: 'New Folder',
+                type: 'folder',
+                children: [],
+                open: true
+            };
+            
+            appData.pages.push(newFolder);
+            saveData();
+            renderSidebar();
+        }
+
+        // --- Drag and Drop Functionality ---
+
+        function handleDragStart(e, itemId) {
+            e.dataTransfer.setData('text/plain', itemId.toString());
+            e.dataTransfer.effectAllowed = 'move';
+            
+            // Add a slight delay to make dragging feel more responsive
+            setTimeout(() => {
+                const itemElement = document.getElementById(`item-${itemId}`);
+                if (itemElement) {
+                    itemElement.style.opacity = '0.4';
+                }
+            }, 0);
+        }
+
+        function handleDragOver(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            e.dataTransfer.dropEffect = 'move';
+            
+            // Add visual feedback for valid drop targets
+            if (e.currentTarget.classList.contains('list-item-container') || 
+                e.currentTarget.id === 'sidebar') {
+                e.currentTarget.style.backgroundColor = 'var(--accent-color)';
+            }
+        }
+
+        function handleDragLeave(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            // Remove visual feedback when leaving
+            if (e.currentTarget.classList.contains('list-item-container') || 
+                e.currentTarget.id === 'sidebar') {
+                e.currentTarget.style.backgroundColor = '';
+            }
+        }
+
+        function handleDrop(e, targetItemId) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            // Remove visual feedback
+            if (e.currentTarget.classList.contains('list-item-container') || 
+                e.currentTarget.id === 'sidebar') {
+                e.currentTarget.style.backgroundColor = '';
+            }
+            
+            const draggedItemId = parseInt(e.dataTransfer.getData('text/plain'));
+            if (draggedItemId === targetItemId) return;
+            
+            const { item: draggedItem, parentId: draggedParentId, parentChildren: draggedParentChildren } = findItemPath(draggedItemId);
+            const { item: targetItem, parentId: targetParentId, parentChildren: targetParentChildren } = findItemPath(targetItemId);
+            
+            if (!draggedItem) return;
+            
+            // Prevent nesting a folder inside itself or its children
+            if (draggedItem.type === 'folder' && targetItem && targetItem.type === 'folder') {
+                if (isDescendant(draggedItemId, targetItem)) {
+                    alert('Cannot move a folder into its own subfolder.');
+                    resetDragState();
+                    return;
+                }
+            }
+            
+            // Remove dragged item from its current location
+            if (draggedParentChildren) {
+                const draggedIndex = draggedParentChildren.findIndex(item => item.id === draggedItemId);
+                if (draggedIndex !== -1) {
+                    draggedParentChildren.splice(draggedIndex, 1);
+                }
+            } else {
+                // If no parent children, remove from root
+                const rootIndex = appData.pages.findIndex(item => item.id === draggedItemId);
+                if (rootIndex !== -1) {
+                    appData.pages.splice(rootIndex, 1);
+                }
+            }
+            
+            // Add dragged item to target
+            if (targetItem && targetItem.type === 'folder') {
+                if (!targetItem.children) {
+                    targetItem.children = [];
+                }
+                // Check if item already exists in target
+                const exists = targetItem.children.some(item => item.id === draggedItemId);
+                if (!exists) {
+                    targetItem.children.push(draggedItem);
+                    targetItem.open = true; // Open the folder when dropping an item into it
+                }
+            } else if (targetItem) {
+                // If target is a page, add to the same parent
+                if (targetParentChildren) {
+                    const targetIndex = targetParentChildren.findIndex(item => item.id === targetItemId);
+                    if (targetIndex !== -1) {
+                        targetParentChildren.splice(targetIndex + 1, 0, draggedItem);
+                    }
+                }
+            } else {
+                // If no target item (dropping on root), add to root
+                appData.pages.push(draggedItem);
+            }
+            
+            saveData();
+            renderSidebar();
+            resetDragState();
+        }
+
+        function handleRootDragOver(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            e.dataTransfer.dropEffect = 'move';
+            e.currentTarget.style.backgroundColor = 'var(--accent-color)';
+        }
+
+        function handleRootDragLeave(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            e.currentTarget.style.backgroundColor = '';
+        }
+
+        function handleRootDrop(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            // Remove visual feedback
+            e.currentTarget.style.backgroundColor = '';
+            
+            const draggedItemId = parseInt(e.dataTransfer.getData('text/plain'));
+            const { item: draggedItem, parentId: draggedParentId, parentChildren: draggedParentChildren } = findItemPath(draggedItemId);
+            
+            if (!draggedItem) return;
+            
+            // Only move if it's not already in root
+            if (draggedParentId !== null) {
+                // Remove dragged item from its current location
+                if (draggedParentChildren) {
+                    const draggedIndex = draggedParentChildren.findIndex(item => item.id === draggedItemId);
+                    if (draggedIndex !== -1) {
+                        draggedParentChildren.splice(draggedIndex, 1);
+                    }
+                }
+                
+                // Add to root
+                appData.pages.push(draggedItem);
+                
+                saveData();
+                renderSidebar();
+            }
+            
+            resetDragState();
+        }
+
+        function resetDragState() {
+            // Reset opacity for all items
+            document.querySelectorAll('.list-item-container').forEach(el => {
+                el.style.opacity = '1';
+                el.style.backgroundColor = '';
+            });
+            
+            // Reset sidebar background
+            document.getElementById('sidebar').style.backgroundColor = '';
+        }
+
+        // Helper function to check if an item is a descendant of another
+        function isDescendant(ancestorId, item) {
+            if (!item || item.type !== 'folder' || !item.children) return false;
+            
+            for (const child of item.children) {
+                if (child.id === ancestorId) return true;
+                if (child.type === 'folder' && isDescendant(ancestorId, child)) return true;
+            }
+            return false;
+        }
+
+        // --- Context Menu ---
+
+        function showContextMenu(e, itemId) {
+            e.preventDefault();
+            contextMenuTargetId = itemId;
+            
+            contextMenu.style.display = 'flex';
+            contextMenu.style.left = `${e.pageX}px`;
+            contextMenu.style.top = `${e.pageY}px`;
+            
+            // Hide context menu when clicking elsewhere
+            document.addEventListener('click', hideContextMenu);
+        }
+
+        function hideContextMenu() {
+            contextMenu.style.display = 'none';
+            document.removeEventListener('click', hideContextMenu);
+        }
+
+        function renameItem(itemId, newName) {
+            const item = findItemById(itemId);
+            if (item && newName.trim() !== '') {
+                item.name = newName.trim();
+                saveData();
+                renderSidebar();
+                
+                if (item.type === 'page' && item.id === appData.activePageId) {
+                    document.title = `${item.name} - Organization`;
+                }
+            }
+        }
+
+        function startRenaming(itemId) {
+            const itemElement = document.getElementById(`item-${itemId}`);
+            if (!itemElement) return;
+            
+            const nameElement = itemElement.querySelector('.item-name');
+            if (!nameElement) return;
+            
+            const currentName = nameElement.textContent;
+            
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.value = currentName;
+            input.className = 'editable-title-temp';
+            
+            nameElement.parentNode.replaceChild(input, nameElement);
+            input.focus();
+            input.select();
+            
+            function finishRenaming() {
+                const newName = input.value.trim();
+                input.parentNode.replaceChild(nameElement, input);
+                nameElement.textContent = newName || currentName;
+                
+                renameItem(itemId, newName);
+            }
+            
+            input.addEventListener('blur', finishRenaming);
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    finishRenaming();
+                } else if (e.key === 'Escape') {
+                    input.parentNode.replaceChild(nameElement, input);
+                }
+            });
+        }
+
+        function deleteItem(itemId) {
+            const { item, parentId, parentChildren } = findItemPath(itemId);
+            
+            if (!item) return;
+            
+            if (confirm(`Are you sure you want to delete "${item.name}"?`)) {
+                if (parentChildren) {
+                    const index = parentChildren.findIndex(i => i.id === itemId);
+                    if (index !== -1) {
+                        parentChildren.splice(index, 1);
+                    }
+                }
+                
+                if (item.id === appData.activePageId) {
+                    appData.activePageId = findFirstPageId(appData.pages);
+                }
+                
+                saveData();
+                renderSidebar();
+                loadActivePage();
+            }
+        }
+
+        function moveToRoot(itemId) {
+            const { item, parentId, parentChildren } = findItemPath(itemId);
+            
+            if (!item || parentId === null) return;
+            
+            // Remove from current location
+            if (parentChildren) {
+                const index = parentChildren.findIndex(i => i.id === itemId);
+                if (index !== -1) {
+                    parentChildren.splice(index, 1);
+                }
+            }
+            
+            // Add to root
+            appData.pages.push(item);
+            
+            saveData();
+            renderSidebar();
+        }
+
+        // --- Text Context Menu ---
+
+        function showTextContextMenu(e) {
+            e.preventDefault();
+            
+            const selection = window.getSelection();
+            if (!selection || selection.toString().trim() === '') return;
+            
+            textContextMenu.style.display = 'flex';
+            textContextMenu.style.left = `${e.pageX}px`;
+            textContextMenu.style.top = `${e.pageY}px`;
+            
+            // Hide context menu when clicking elsewhere
+            document.addEventListener('click', hideTextContextMenu);
+        }
+
+        function hideTextContextMenu() {
+            textContextMenu.style.display = 'none';
+            document.removeEventListener('click', hideTextContextMenu);
+        }
+
+        function applyTextFormatting(format) {
+            const selection = window.getSelection();
+            if (!selection.rangeCount) return;
+            
+            const range = selection.getRangeAt(0);
+            const selectedText = range.toString();
+            
+            if (selectedText.trim() === '') return;
+            
+            let formattedText = '';
+            
+            switch(format) {
+                case 'link':
+                    const url = prompt('Enter URL:', 'https://');
+                    if (url) {
+                        formattedText = `<a href="${url}" target="_blank">${selectedText}</a>`;
+                    } else {
+                        return;
+                    }
+                    break;
+                case 'underline':
+                    formattedText = `<span class="underline">${selectedText}</span>`;
+                    break;
+                case 'italic':
+                    formattedText = `<span class="italic">${selectedText}</span>`;
+                    break;
+                case 'quote':
+                    formattedText = `<div class="quote">${selectedText}</div>`;
+                    break;
+                case 'dotted-list':
+                    formattedText = `<ul class="dotted-list"><li>${selectedText}</li></ul>`;
+                    break;
+                case 'numbered-list':
+                    formattedText = `<ol class="numbered-list"><li>${selectedText}</li></ol>`;
+                    break;
+            }
+            
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = formattedText;
+            range.deleteContents();
+            range.insertNode(tempDiv.firstChild);
+            
+            // Update the page content
+            const activePage = findPageById(appData.activePageId);
+            if (activePage) {
+                activePage.content = pageContentInput.innerHTML;
+                saveData();
+            }
+            
+            hideTextContextMenu();
+        }
+
+        // --- Image Context Menu ---
+
+        function showImageContextMenu(e, image) {
+            e.preventDefault();
+            selectedImage = image;
+            
+            imageContextMenu.style.display = 'flex';
+            imageContextMenu.style.left = `${e.pageX}px`;
+            imageContextMenu.style.top = `${e.pageY}px`;
+            
+            // Hide context menu when clicking elsewhere
+            document.addEventListener('click', hideImageContextMenu);
+        }
+
+        function hideImageContextMenu() {
+            imageContextMenu.style.display = 'none';
+            document.removeEventListener('click', hideImageContextMenu);
+        }
+
+        function alignImage(alignment) {
+            if (!selectedImage) return;
+            
+            const wrapper = selectedImage.parentNode;
+            if (wrapper.classList.contains('image-wrapper')) {
+                wrapper.style.textAlign = alignment;
+                
+                // Update the page content
+                const activePage = findPageById(appData.activePageId);
+                if (activePage) {
+                    activePage.content = pageContentInput.innerHTML;
+                    saveData();
+                }
+            }
+            
+            hideImageContextMenu();
+        }
+
+        // --- Image Handling ---
+
+        function handleImagePaste(e) {
+            const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+            
+            for (const item of items) {
+                if (item.type.indexOf('image') !== -1) {
+                    e.preventDefault();
+                    
+                    const file = item.getAsFile();
+                    const reader = new FileReader();
+                    
+                    reader.onload = function(event) {
+                        const img = document.createElement('img');
+                        img.src = event.target.result;
+                        
+                        // Create wrapper for the image
+                        const wrapper = document.createElement('div');
+                        wrapper.className = 'image-wrapper';
+                        
+                        // Add resize handles
+                        const handles = [
+                            { position: 'top-left', cursor: 'nw-resize' },
+                            { position: 'top-right', cursor: 'ne-resize' },
+                            { position: 'bottom-left', cursor: 'sw-resize' },
+                            { position: 'bottom-right', cursor: 'se-resize' }
+                        ];
+                        
+                        handles.forEach(handle => {
+                            const handleDiv = document.createElement('div');
+                            handleDiv.className = `image-resize-handle ${handle.position}`;
+                            handleDiv.style.cursor = handle.cursor;
+                            wrapper.appendChild(handleDiv);
+                        });
+                        
+                        wrapper.appendChild(img);
+                        
+                        // Add event listeners for image
+                        img.addEventListener('dragstart', handleImageDragStart);
+                        img.addEventListener('dragend', handleImageDragEnd);
+                        img.addEventListener('contextmenu', (e) => showImageContextMenu(e, img));
+                        
+                        // Add event listeners for resize handles
+                        wrapper.querySelectorAll('.image-resize-handle').forEach(handle => {
+                            handle.addEventListener('mousedown', (e) => startImageResize(e, img, handle));
+                        });
+                        
+                        // Insert the image at cursor position
+                        const selection = window.getSelection();
+                        if (selection.rangeCount) {
+                            const range = selection.getRangeAt(0);
+                            range.deleteContents();
+                            range.insertNode(wrapper);
+                        } else {
+                            pageContentInput.appendChild(wrapper);
+                        }
+                        
+                        // Update the page content
+                        const activePage = findPageById(appData.activePageId);
+                        if (activePage) {
+                            activePage.content = pageContentInput.innerHTML;
+                            saveData();
+                        }
+                    };
+                    
+                    reader.readAsDataURL(file);
+                    break;
+                }
+            }
+        }
+
+        function handleImageDragStart(e) {
+            isDraggingImage = true;
+            e.dataTransfer.setData('text/plain', 'image');
+            e.dataTransfer.effectAllowed = 'move';
+            
+            setTimeout(() => {
+                e.target.style.opacity = '0.5';
+            }, 0);
+        }
+
+        function handleImageDragEnd(e) {
+            isDraggingImage = false;
+            e.target.style.opacity = '1';
+            
+            // Update the page content
+            const activePage = findPageById(appData.activePageId);
+            if (activePage) {
+                activePage.content = pageContentInput.innerHTML;
+                saveData();
+            }
+        }
+
+        function addResizeHandlesToImages() {
+            const images = pageContentInput.querySelectorAll('img');
+            
+            images.forEach(img => {
+                // Check if the image already has a wrapper
+                if (!img.parentNode.classList.contains('image-wrapper')) {
+                    const wrapper = document.createElement('div');
+                    wrapper.className = 'image-wrapper';
+                    
+                    // Move the image into the wrapper
+                    img.parentNode.insertBefore(wrapper, img);
+                    wrapper.appendChild(img);
+                    
+                    // Add resize handles
+                    const handles = [
+                        { position: 'top-left', cursor: 'nw-resize' },
+                        { position: 'top-right', cursor: 'ne-resize' },
+                        { position: 'bottom-left', cursor: 'sw-resize' },
+                        { position: 'bottom-right', cursor: 'se-resize' }
+                    ];
+                    
+                    handles.forEach(handle => {
+                        const handleDiv = document.createElement('div');
+                        handleDiv.className = `image-resize-handle ${handle.position}`;
+                        handleDiv.style.cursor = handle.cursor;
+                        wrapper.appendChild(handleDiv);
+                    });
+                }
+                
+                // Add event listeners
+                img.addEventListener('dragstart', handleImageDragStart);
+                img.addEventListener('dragend', handleImageDragEnd);
+                img.addEventListener('contextmenu', (e) => showImageContextMenu(e, img));
+                
+                const wrapper = img.parentNode;
+                wrapper.querySelectorAll('.image-resize-handle').forEach(handle => {
+                    handle.addEventListener('mousedown', (e) => startImageResize(e, img, handle));
+                });
+            });
+        }
+
+        function startImageResize(e, img, handle) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            isResizingImage = true;
+            resizeHandle = handle;
+            originalWidth = img.offsetWidth;
+            originalHeight = img.offsetHeight;
+            originalAspectRatio = originalWidth / originalHeight;
+            originalMouseX = e.clientX;
+            originalMouseY = e.clientY;
+            
+            document.addEventListener('mousemove', resizeImage);
+            document.addEventListener('mouseup', stopImageResize);
+            
+            // Select the image
+            selectedImage = img;
+            document.querySelectorAll('.image-wrapper').forEach(wrapper => {
+                wrapper.classList.remove('selected');
+            });
+            img.parentNode.classList.add('selected');
+        }
+
+        function resizeImage(e) {
+            if (!isResizingImage || !resizeHandle) return;
+            
+            const deltaX = e.clientX - originalMouseX;
+            const deltaY = e.clientY - originalMouseY;
+            
+            let newWidth = originalWidth;
+            let newHeight = originalHeight;
+            
+            if (resizeHandle.classList.contains('bottom-right')) {
+                newWidth = originalWidth + deltaX;
+                newHeight = originalHeight + deltaY;
+            } else if (resizeHandle.classList.contains('bottom-left')) {
+                newWidth = originalWidth - deltaX;
+                newHeight = originalHeight + deltaY;
+            } else if (resizeHandle.classList.contains('top-right')) {
+                newWidth = originalWidth + deltaX;
+                newHeight = originalHeight - deltaY;
+            } else if (resizeHandle.classList.contains('top-left')) {
+                newWidth = originalWidth - deltaX;
+                newHeight = originalHeight - deltaY;
+            }
+            
+            // Maintain aspect ratio if Shift key is pressed
+            if (e.shiftKey) {
+                if (resizeHandle.classList.contains('bottom-right') || resizeHandle.classList.contains('top-left')) {
+                    newHeight = newWidth / originalAspectRatio;
+                } else if (resizeHandle.classList.contains('bottom-left') || resizeHandle.classList.contains('top-right')) {
+                    newWidth = newHeight * originalAspectRatio;
+                }
+            }
+            
+            // Set minimum dimensions
+            newWidth = Math.max(50, newWidth);
+            newHeight = Math.max(50, newHeight);
+            
+            selectedImage.style.width = `${newWidth}px`;
+            selectedImage.style.height = `${newHeight}px`;
+        }
+
+        function stopImageResize() {
+            isResizingImage = false;
+            resizeHandle = null;
+            
+            document.removeEventListener('mousemove', resizeImage);
+            document.removeEventListener('mouseup', stopImageResize);
+            
+            // Update the page content
+            const activePage = findPageById(appData.activePageId);
+            if (activePage) {
+                activePage.content = pageContentInput.innerHTML;
+                saveData();
+            }
+        }
+
+        // --- Download Functionality ---
+
+        function showDownloadOptions(target) {
+            currentDownloadTarget = target;
+            const modal = document.getElementById('download-modal-overlay');
+            modal.classList.remove('hidden');
+            
+            // Show/hide ZIP option based on target
+            if (target === 'folder' || target === 'all') {
+                zipOptionLabel.classList.remove('hidden');
+            } else {
+                zipOptionLabel.classList.add('hidden');
+            }
+        }
+
+        function handleDownload() {
+            const contentType = document.querySelector('input[name="content_type"]:checked').value;
+            const formatType = document.querySelector('input[name="format_type"]:checked').value;
+            
+            if (formatType === 'zip') {
+                downloadAsZip();
+            } else {
+                downloadAsSingleFile(contentType, formatType);
+            }
+            
+            document.getElementById('download-modal-overlay').classList.add('hidden');
+        }
+
+        function downloadAsSingleFile(contentType, formatType) {
+            let content = '';
+            let filename = '';
+            
+            if (currentDownloadTarget === 'page') {
+                const page = findPageById(appData.activePageId);
+                if (!page) return;
+                
+                filename = page.name;
+                content = contentType === 'text' ? extractTextFromHTML(page.content) : page.content;
+            } else if (currentDownloadTarget === 'folder') {
+                const { parentId } = findItemPath(appData.activePageId);
+                if (!parentId) return;
+                
+                const folder = findItemById(parentId);
+                if (!folder) return;
+                
+                filename = folder.name;
+                content = collectFolderContent(folder, contentType);
+            } else if (currentDownloadTarget === 'all') {
+                filename = 'All Pages';
+                content = collectAllContent(appData.pages, contentType);
+            }
+            
+            if (formatType === 'pdf') {
+                downloadAsPDF(content, filename, contentType === 'text_with_images');
+            } else {
+                downloadAsText(content, filename);
+            }
+        }
+
+        function downloadAsZip() {
+            // Show loading indicator
+            pdfLoading.style.display = 'block';
+            
+            // Use setTimeout to allow the UI to update
+            setTimeout(async () => {
+                try {
+                    const zip = new JSZip();
+                    
+                    if (currentDownloadTarget === 'folder') {
+                        const { parentId } = findItemPath(appData.activePageId);
+                        if (!parentId) {
+                            alert('No folder found for the current page.');
+                            pdfLoading.style.display = 'none';
+                            return;
+                        }
+                        
+                        const folder = findItemById(parentId);
+                        if (!folder) {
+                            alert('Folder not found.');
+                            pdfLoading.style.display = 'none';
+                            return;
+                        }
+                        
+                        await addFolderToZip(zip, folder);
+                        
+                        // Generate the zip file with better compatibility settings
+                        const zipBlob = await zip.generateAsync({
+                            type: 'blob',
+                            compression: 'STORE', // No compression for better compatibility
+                            compressionOptions: { level: 0 },
+                            platform: 'DOS' // Use DOS platform for better Windows compatibility
+                        });
+                        
+                        // Create download link with proper MIME type
+                        const url = URL.createObjectURL(zipBlob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `${folder.name}.zip`;
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        
+                        // Clean up URL after download
+                        setTimeout(() => URL.revokeObjectURL(url), 1000);
+                        
+                    } else if (currentDownloadTarget === 'all') {
+                        await addAllToZip(zip, appData.pages);
+                        
+                        // Generate the zip file with better compatibility settings
+                        const zipBlob = await zip.generateAsync({
+                            type: 'blob',
+                            compression: 'STORE', // No compression for better compatibility
+                            compressionOptions: { level: 0 },
+                            platform: 'DOS' // Use DOS platform for better Windows compatibility
+                        });
+                        
+                        // Create download link with proper MIME type
+                        const url = URL.createObjectURL(zipBlob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = 'All Pages.zip';
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        
+                        // Clean up URL after download
+                        setTimeout(() => URL.revokeObjectURL(url), 1000);
+                    }
+                    
+                } catch (error) {
+                    console.error('Error creating zip file:', error);
+                    alert('Error creating zip file. Please try again.');
+                } finally {
+                    // Hide loading indicator
+                    pdfLoading.style.display = 'none';
+                }
+            }, 100);
+        }
+
+        async function addFolderToZip(zip, folder, path = '') {
+            const folderPath = path ? `${path}/${folder.name}` : folder.name;
+            
+            if (folder.children && Array.isArray(folder.children)) {
+                for (const item of folder.children) {
+                    if (item.type === 'page') {
+                        // Always use text-only content for ZIP files
+                        const textContent = extractTextFromHTML(item.content);
+                        zip.file(`${folderPath}/${item.name}.txt`, textContent);
+                    } else if (item.type === 'folder') {
+                        await addFolderToZip(zip, item, folderPath);
+                    }
+                }
+            }
+        }
+
+        async function addAllToZip(zip, items, path = '') {
+            for (const item of items) {
+                if (item.type === 'page') {
+                    const itemPath = path ? `${path}/${item.name}` : item.name;
+                    
+                    // Always use text-only content for ZIP files
+                    const textContent = extractTextFromHTML(item.content);
+                    zip.file(`${itemPath}.txt`, textContent);
+                } else if (item.type === 'folder') {
+                    await addFolderToZip(zip, item, path);
+                }
+            }
+        }
+
+        function collectFolderContent(folder, contentType) {
+            let content = '';
+            
+            function processFolder(folder, depth = 0) {
+                if (folder.children && Array.isArray(folder.children)) {
+                    folder.children.forEach(item => {
+                        if (item.type === 'page') {
+                            const indent = '  '.repeat(depth);
+                            content += `${indent}${item.name}\n`;
+                            content += `${indent}${'='.repeat(item.name.length)}\n\n`;
+                            
+                            if (contentType === 'text') {
+                                content += `${extractTextFromHTML(item.content)}\n\n`;
+                            } else {
+                                content += `${item.content}\n\n`;
+                            }
+                            
+                            content += '\n';
+                        } else if (item.type === 'folder') {
+                            const indent = '  '.repeat(depth);
+                            content += `${indent}${item.name}/\n`;
+                            content += `${indent}${'-'.repeat(item.name.length + 1)}\n\n`;
+                            processFolder(item, depth + 1);
+                        }
+                    });
+                }
+            }
+            
+            content += `${folder.name}/\n`;
+            content += `${'='.repeat(folder.name.length + 1)}\n\n`;
+            processFolder(folder, 1);
+            
+            return content;
+        }
+
+        function collectAllContent(items, contentType, depth = 0) {
+            let content = '';
+            
+            items.forEach(item => {
+                if (item.type === 'page') {
+                    const indent = '  '.repeat(depth);
+                    content += `${indent}${item.name}\n`;
+                    content += `${indent}${'='.repeat(item.name.length)}\n\n`;
+                    
+                    if (contentType === 'text') {
+                        content += `${extractTextFromHTML(item.content)}\n\n`;
+                    } else {
+                        content += `${item.content}\n\n`;
+                    }
+                    
+                    content += '\n';
+                } else if (item.type === 'folder') {
+                    const indent = '  '.repeat(depth);
+                    content += `${indent}${item.name}/\n`;
+                    content += `${indent}${'-'.repeat(item.name.length + 1)}\n\n`;
+                    content += collectAllContent(item.children, contentType, depth + 1);
+                }
+            });
+            
+            return content;
+        }
+
+        function extractTextFromHTML(html) {
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = html;
+            return tempDiv.textContent || tempDiv.innerText || '';
+        }
+
+        function downloadAsText(content, filename) {
+            const blob = new Blob([content], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${filename}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        function downloadAsPDF(content, filename, includeImages = false) {
+            if (includeImages) {
+                // Show loading indicator
+                pdfLoading.style.display = 'block';
+                
+                // Use setTimeout to allow the UI to update
+                setTimeout(() => {
+                    // Use the existing off-screen container for PDF generation
+                    const tempContainer = document.getElementById('pdf-export-content');
+                    tempContainer.innerHTML = '';
+                    
+                    // Create content wrapper
+                    const contentWrapper = document.createElement('div');
+                    contentWrapper.style.width = '800px';
+                    contentWrapper.style.padding = '20px';
+                    contentWrapper.style.fontFamily = 'Times New Roman, Times, serif';
+                    contentWrapper.style.lineHeight = '1.6';
+                    contentWrapper.style.backgroundColor = '#ffffff';
+                    contentWrapper.style.color = '#000000';
+                    
+                    // Add title
+                    const titleElement = document.createElement('h1');
+                    titleElement.textContent = filename;
+                    titleElement.style.marginBottom = '20px';
+                    titleElement.style.borderBottom = '1px solid #000';
+                    titleElement.style.paddingBottom = '10px';
+                    contentWrapper.appendChild(titleElement);
+                    
+                    // Add content
+                    const contentDiv = document.createElement('div');
+                    contentDiv.innerHTML = content;
+                    contentWrapper.appendChild(contentDiv);
+                    
+                    tempContainer.appendChild(contentWrapper);
+                    
+                    // Use html2canvas to capture the content
+                    html2canvas(contentWrapper, {
+                        scale: 2,
+                        useCORS: true,
+                        logging: false,
+                        backgroundColor: '#ffffff'
+                    }).then(canvas => {
+                        const imgData = canvas.toDataURL('image/jpeg', 0.9);
+                        const pdf = new jspdf.jsPDF({
+                            orientation: 'portrait',
+                            unit: 'mm',
+                            format: 'a4'
+                        });
+                        
+                        const imgWidth = 190; // A4 width in mm minus margins
+                        const pageHeight = 277; // A4 height in mm minus margins
+                        const imgHeight = canvas.height * imgWidth / canvas.width;
+                        let heightLeft = imgHeight;
+                        let position = 10; // Start 10mm from top
+                        
+                        pdf.addImage(imgData, 'JPEG', 10, position, imgWidth, imgHeight);
+                        heightLeft -= pageHeight;
+                        
+                        // Add new pages if content is longer than one page
+                        while (heightLeft >= 0) {
+                            position = heightLeft - imgHeight + 10;
+                            pdf.addPage();
+                            pdf.addImage(imgData, 'JPEG', 10, position, imgWidth, imgHeight);
+                            heightLeft -= pageHeight;
+                        }
+                        
+                        // Save the PDF
+                        pdf.save(`${filename}.pdf`);
+                        
+                        // Clear the temporary container and hide loading indicator
+                        tempContainer.innerHTML = '';
+                        pdfLoading.style.display = 'none';
+                    }).catch(error => {
+                        console.error('Error generating PDF:', error);
+                        // Clear the temporary container on error
+                        tempContainer.innerHTML = '';
+                        pdfLoading.style.display = 'none';
+                        alert('Error generating PDF. Please try again.');
+                    });
+                }, 100);
+            } else {
+                // Text-only PDF - use jsPDF directly (safer method)
+                const { jsPDF } = window.jspdf;
+                const pdf = new jsPDF();
+                
+                // Set font
+                pdf.setFont('helvetica');
+                
+                // Add title
+                pdf.setFontSize(16);
+                pdf.text(filename, 20, 20);
+                
+                // Add separator line
+                pdf.setLineWidth(0.5);
+                pdf.line(20, 25, 190, 25);
+                
+                // Add content
+                pdf.setFontSize(12);
+                const textContent = extractTextFromHTML(content);
+                const lines = pdf.splitTextToSize(textContent, 170);
+                pdf.text(lines, 20, 35);
+                
+                // Save the PDF
+                pdf.save(`${filename}.pdf`);
+            }
+        }
+
+        // --- Word Count Functionality ---
+
+        function updateWordCount() {
+            let wordCount = 0;
+            
+            if (wordCountScope === 'page') {
+                const page = findPageById(appData.activePageId);
+                if (page) {
+                    const text = extractTextFromHTML(page.content);
+                    wordCount = countWords(text);
+                }
+            } else if (wordCountScope === 'folder') {
+                const { parentId } = findItemPath(appData.activePageId);
+                if (parentId) {
+                    const folder = findItemById(parentId);
+                    if (folder) {
+                        wordCount = countWordsInFolder(folder);
+                    }
+                } else {
+                    // If no parent folder, count all pages
+                    wordCount = countWordsInItems(appData.pages);
+                }
+            } else if (wordCountScope === 'all') {
+                wordCount = countWordsInItems(appData.pages);
+            }
+            
+            wordCounter.textContent = `Words: ${wordCount}`;
+            
+            if (wordCountGoal) {
+                wordCounter.textContent += ` / ${wordCountGoal}`;
+            }
+            
+            return wordCount;
+        }
+
+        function countWords(text) {
+            return text.trim() === '' ? 0 : text.trim().split(/\s+/).length;
+        }
+
+        function countWordsInFolder(folder) {
+            let total = 0;
+            
+            if (folder.children && Array.isArray(folder.children)) {
+                folder.children.forEach(item => {
+                    if (item.type === 'page') {
+                        const text = extractTextFromHTML(item.content);
+                        total += countWords(text);
+                    } else if (item.type === 'folder') {
+                        total += countWordsInFolder(item);
+                    }
+                });
+            }
+            
+            return total;
+        }
+
+        function countWordsInItems(items) {
+            let total = 0;
+            
+            items.forEach(item => {
+                if (item.type === 'page') {
+                    const text = extractTextFromHTML(item.content);
+                    total += countWords(text);
+                } else if (item.type === 'folder') {
+                    total += countWordsInFolder(item);
+                }
+            });
+            
+            return total;
+        }
+
+        function updateWordCountProgress() {
+            if (!wordCountGoal) {
+                wordCountProgress.style.height = '0';
+                return;
+            }
+            
+            const wordCount = updateWordCount();
+            const progress = Math.min(100, (wordCount / wordCountGoal) * 100);
+            
+            wordCountProgress.style.height = `${progress}%`;
+            
+            if (progress >= 100) {
+                wordCountProgress.classList.add('complete');
+            } else {
+                wordCountProgress.classList.remove('complete');
+            }
+        }
+
+        function toggleWordCountModal() {
+            const modal = document.getElementById('word-count-modal-overlay');
+            modal.classList.toggle('hidden');
+            
+            if (!modal.classList.contains('hidden')) {
+                document.getElementById('word-count-goal').value = wordCountGoal || 500;
+                document.querySelector(`input[name="word-count-scope"][value="${wordCountScope}"]`).checked = true;
+            }
+        }
+
+        function setWordCountGoal() {
+            const goalInput = document.getElementById('word-count-goal');
+            const scopeInput = document.querySelector('input[name="word-count-scope"]:checked');
+            
+            if (goalInput && scopeInput) {
+                wordCountGoal = parseInt(goalInput.value);
+                wordCountScope = scopeInput.value;
+                
+                if (wordCountGoal > 0) {
+                    const settings = { goal: wordCountGoal, scope: wordCountScope };
+                    localStorage.setItem(WORD_COUNT_KEY, JSON.stringify(settings));
+                    
+                    updateWordCount();
+                    updateWordCountProgress();
+                }
+            }
+            
+            document.getElementById('word-count-modal-overlay').classList.add('hidden');
+        }
+
+        // --- Theme Management ---
+
+        function toggleTheme() {
+            document.body.classList.toggle('dark-mode');
+            const isDarkMode = document.body.classList.contains('dark-mode');
+            localStorage.setItem(THEME_KEY, isDarkMode ? 'dark' : 'light');
+        }
+
+        function loadTheme() {
+            const savedTheme = localStorage.getItem(THEME_KEY);
+            if (savedTheme === 'dark') {
+                document.body.classList.add('dark-mode');
+            }
+        }
+
+        // --- Event Listeners ---
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadTheme();
+            loadData();
+            
+            // Event listeners for sidebar resizing
+            sidebarResizer.addEventListener('mousedown', startResizeSidebar);
+            
+            // Event listeners for context menu actions
+            contextRenameBtn.addEventListener('click', () => {
+                if (contextMenuTargetId) {
+                    startRenaming(contextMenuTargetId);
+                    hideContextMenu();
+                }
+            });
+            
+            contextMoveToRootBtn.addEventListener('click', () => {
+                if (contextMenuTargetId) {
+                    moveToRoot(contextMenuTargetId);
+                    hideContextMenu();
+                }
+            });
+            
+            contextDeleteBtn.addEventListener('click', () => {
+                if (contextMenuTargetId) {
+                    deleteItem(contextMenuTargetId);
+                    hideContextMenu();
+                }
+            });
+            
+            // Event listeners for text context menu
+            textLinkBtn.addEventListener('click', () => applyTextFormatting('link'));
+            textUnderlineBtn.addEventListener('click', () => applyTextFormatting('underline'));
+            textItalicBtn.addEventListener('click', () => applyTextFormatting('italic'));
+            textQuoteBtn.addEventListener('click', () => applyTextFormatting('quote'));
+            textDottedListBtn.addEventListener('click', () => applyTextFormatting('dotted-list'));
+            textNumberedListBtn.addEventListener('click', () => applyTextFormatting('numbered-list'));
+            
+            // Event listeners for image context menu
+            imageAlignLeftBtn.addEventListener('click', () => alignImage('left'));
+            imageAlignCenterBtn.addEventListener('click', () => alignImage('center'));
+            imageAlignRightBtn.addEventListener('click', () => alignImage('right'));
+            
+            // Event listeners for text selection context menu
+            document.addEventListener('mouseup', (e) => {
+                const selection = window.getSelection();
+                if (selection.toString().trim() !== '' && e.button === 2) {
+                    showTextContextMenu(e);
+                }
+            });
+            
+            // Event listeners for buttons
+            newPageBtnTop.addEventListener('click', () => createPage());
+            newPageBtnSidebar.addEventListener('click', () => createPage());
+            themeToggleBtn.addEventListener('click', toggleTheme);
+            
+            // Update word count when content changes
+            pageContentInput.addEventListener('input', () => {
+                updateWordCount();
+                updateWordCountProgress();
+            });
+            
+            // Initialize word count
+            updateWordCount();
+            updateWordCountProgress();
+        });
+    </script>
+</body>
+</html>
