@@ -1,0 +1,1696 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scientific Calculator</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.11.0/math.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #f0f0f0;
+            --panel-bg: #ffffff;
+            --border-color: #333;
+            --button-bg: #e0e0e0;
+            --button-hover: #d0d0d0;
+            --accent-1: #4a90e2;
+            --accent-2: #4a90e2;
+            --accent-3: #50c878;
+            --delete-color: #e24a4a;
+            --text-color: #000;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Times New Roman', Times, serif;
+            background-color: var(--bg-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 40px;
+        }
+
+        #calculator-container {
+            display: grid;
+            grid-template-columns: 250px 600px 300px;
+            grid-template-rows: auto auto;
+            gap: 15px;
+            max-width: 1200px;
+        }
+
+        .panel {
+            background-color: var(--panel-bg);
+            border: 2px solid var(--border-color);
+            padding: 15px;
+            box-shadow: 3px 3px 0 rgba(0,0,0,0.2);
+        }
+
+        /* Section D - Graph and Table (Hidden by default) */
+        #section-d {
+            grid-column: 1 / 4;
+            grid-row: 2;
+            display: none;
+        }
+
+        #section-d.visible {
+            display: flex;
+            gap: 15px;
+            align-items: flex-start;
+        }
+
+        .graph-section {
+            flex: 1;
+        }
+
+        .table-section {
+            width: 350px;
+            display: none;
+        }
+
+        .table-section.visible {
+            display: block;
+        }
+
+        .graph-controls {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+        }
+
+        #graph-canvas {
+            width: 100%;
+            height: 400px;
+            border: 1px solid var(--border-color);
+            background: #fff;
+        }
+
+        .graph-inputs {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .graph-inputs > div {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .graph-inputs .input-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .graph-inputs label {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 12px;
+            white-space: nowrap;
+        }
+
+        .graph-inputs input {
+            width: 70px;
+            padding: 3px;
+            font-size: 12px;
+        }
+
+        .tick-controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 5px;
+            flex-wrap: wrap;
+        }
+
+        .tick-controls label {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 12px;
+        }
+
+        #equations-list {
+            margin-bottom: 10px;
+        }
+
+        /* Section C - Variables */
+        #section-c {
+            grid-column: 1;
+            grid-row: 1;
+        }
+
+        /* Section A - Calculator */
+        #section-a {
+            grid-column: 2;
+            grid-row: 1;
+        }
+
+        /* Section B - Notes */
+        #section-b {
+            grid-column: 3;
+            grid-row: 1;
+        }
+
+        h3 {
+            margin-bottom: 10px;
+            font-size: 16px;
+            border-bottom: 2px solid var(--accent-1);
+            padding-bottom: 5px;
+        }
+
+        /* Calculator Display */
+        #display-area {
+            background: #fafafa;
+            border: 2px inset var(--border-color);
+            padding: 10px;
+            margin-bottom: 10px;
+            min-height: 150px;
+            max-height: 150px;
+            overflow-y: auto;
+            font-size: 14px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .history-item {
+            margin-bottom: 5px;
+            color: #666;
+            padding: 3px 0;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .history-expression {
+            flex: 1;
+        }
+
+        .history-result {
+            color: var(--accent-1);
+            font-weight: bold;
+            margin-left: 10px;
+        }
+
+        .current-calculation {
+            display: flex;
+            justify-content: space-between;
+            margin-top: auto;
+            padding-top: 10px;
+            border-top: 1px solid rgba(0, 0, 0, 0.2);
+        }
+
+        .current-input {
+            font-weight: bold;
+            color: var(--text-color);
+        }
+
+        .current-result {
+            font-size: 18px;
+            color: var(--accent-1);
+            font-weight: bold;
+        }
+
+        /* Direct input field */
+        #direct-input {
+            width: 100%;
+            padding: 8px;
+            font-family: inherit;
+            font-size: 14px;
+            border: 1px solid var(--border-color);
+            margin-bottom: 10px;
+        }
+
+        /* Calculator Tabs */
+        .tab-container {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 10px;
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 5px;
+            background: var(--button-bg);
+            border: 1px solid var(--border-color);
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 12px;
+        }
+
+        .tab-btn.active {
+            background: var(--accent-1);
+            color: white;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: grid;
+        }
+
+        /* Calculator Buttons */
+        .button-grid {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 4px;
+        }
+
+        .calc-btn {
+            padding: 10px 4px;
+            background: var(--button-bg);
+            border: 1px solid var(--border-color);
+            border-right: 2px solid #555;
+            border-bottom: 2px solid #555;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 13px;
+            transition: background 0.1s;
+            color: var(--text-color);
+        }
+
+        .calc-btn:hover {
+            background: var(--button-hover);
+        }
+
+        .calc-btn:active {
+            border: 2px solid #555;
+            border-right: 1px solid var(--border-color);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .calc-btn.operator {
+            background: var(--accent-2);
+        }
+
+        .calc-btn.function {
+            background: var(--accent-3);
+        }
+
+        .calc-btn.trig {
+            background: var(--button-bg);
+        }
+
+        .calc-btn.advanced {
+            background: var(--accent-1);
+            color: white;
+        }
+
+        .calc-btn.matrix {
+            background: var(--accent-3);
+        }
+
+        .calc-btn.wide {
+            grid-column: span 2;
+        }
+
+        /* Variables Section */
+        #variables-list {
+            background: #fafafa;
+            border: 2px inset var(--border-color);
+            padding: 10px;
+            min-height: 300px;
+            max-height: 500px;
+            overflow-y: auto;
+            font-size: 13px;
+            margin-bottom: 10px;
+        }
+
+        .variable-item {
+            margin-bottom: 8px;
+            padding: 8px;
+            background: white;
+            border: 1px solid #ddd;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+            position: relative;
+        }
+
+        .variable-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+
+        .variable-name {
+            font-weight: bold;
+            color: var(--accent-1);
+        }
+
+        .delete-variable {
+            background: var(--delete-color);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .delete-variable:hover {
+            background: #c03939;
+        }
+
+        .variable-input {
+            width: 100%;
+            padding: 5px;
+            font-family: inherit;
+            font-size: 12px;
+            border: 1px solid var(--border-color);
+        }
+
+        .variable-value {
+            margin-top: 5px;
+            font-style: italic;
+            color: #666;
+        }
+
+        /* Notes Section */
+        #notes-area {
+            width: 100%;
+            height: 500px;
+            padding: 10px;
+            font-family: inherit;
+            font-size: 13px;
+            border: 2px inset var(--border-color);
+            resize: vertical;
+        }
+
+        /* Buttons */
+        button, .btn {
+            padding: 8px 12px;
+            background: var(--button-bg);
+            border: 1px solid var(--border-color);
+            border-right: 2px solid #555;
+            border-bottom: 2px solid #555;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 12px;
+            margin-right: 5px;
+            margin-bottom: 5px;
+            color: var(--text-color);
+        }
+
+        button:hover {
+            background: var(--button-hover);
+        }
+
+        button:active {
+            border: 2px solid #555;
+            border-right: 1px solid var(--border-color);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        /* Table Section */
+        .table-controls {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            margin-bottom: 10px;
+        }
+
+        .table-controls label {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 12px;
+        }
+
+        .table-controls input {
+            width: 70px;
+            padding: 3px;
+            font-size: 12px;
+        }
+
+        #value-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+
+        #value-table th, #value-table td {
+            border: 1px solid var(--border-color);
+            padding: 5px;
+            text-align: center;
+        }
+
+        #value-table th.editable {
+            cursor: pointer;
+            position: relative;
+        }
+
+        #value-table th.editable:hover {
+            background-color: #f0f0f0;
+        }
+
+        #value-table th.editable input {
+            width: 100%;
+            border: none;
+            background: transparent;
+            text-align: center;
+            font-weight: bold;
+            font-family: inherit;
+            font-size: inherit;
+            outline: none;
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+        }
+
+        .modal.visible {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            background: var(--panel-bg);
+            border: 3px solid var(--border-color);
+            padding: 20px;
+            max-width: 500px;
+            box-shadow: 5px 5px 0 rgba(0,0,0,0.3);
+        }
+
+        .checkbox-group {
+            margin: 15px 0;
+        }
+
+        .checkbox-group label {
+            display: block;
+            margin-bottom: 8px;
+        }
+
+        input[type="checkbox"] {
+            margin-right: 8px;
+        }
+
+        input[type="text"], input[type="number"] {
+            padding: 5px;
+            font-family: inherit;
+            border: 1px solid var(--border-color);
+            width: 100%;
+            margin-bottom: 5px;
+        }
+
+        .equation-item {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 5px;
+            align-items: center;
+        }
+
+        .color-picker {
+            width: 40px;
+            height: 25px;
+            border: 1px solid var(--border-color);
+            cursor: pointer;
+        }
+
+        .equation-type {
+            padding: 3px 6px;
+            font-size: 11px;
+            border: 1px solid var(--border-color);
+            background: var(--button-bg);
+            cursor: pointer;
+            width: 100px; /* Fixed width for all dropdowns */
+        }
+    </style>
+</head>
+<body>
+    <div id="calculator-container">
+        <!-- Section C: Variables -->
+        <div id="section-c" class="panel">
+            <h3>Variables</h3>
+            <div id="variables-list"></div>
+            <div style="display: flex; gap: 5px; margin-top: 10px;">
+                <input type="text" id="new-var-input" placeholder="e.g., y=3x+4" style="flex: 1;">
+                <button onclick="addVariableFromInput()">Add</button>
+            </div>
+            <button onclick="clearVariables()" style="margin-top: 5px;">Clear All</button>
+        </div>
+
+        <!-- Section A: Calculator -->
+        <div id="section-a" class="panel">
+            <h3>Scientific Calculator</h3>
+            
+            <div id="display-area">
+                <div id="history"></div>
+                <div class="current-calculation">
+                    <div class="current-input" id="current-input"></div>
+                    <div class="current-result" id="current-result">0</div>
+                </div>
+            </div>
+            
+            <!-- Direct input field - moved between display and buttons -->
+            <input type="text" id="direct-input" placeholder="Type your equation here or use buttons below" onkeydown="handleDirectInput(event)">
+            
+            <div style="margin-bottom: 10px;">
+                <button onclick="calculate()">= Calculate</button>
+                <button onclick="clearDisplay()">Clear Input</button>
+                <button onclick="clearHistory()">Clear History</button>
+                <button onclick="toggleGraph()">Graph</button>
+                <button onclick="showDownloadModal()">Save/Load</button>
+            </div>
+            
+            <div class="tab-container">
+                <button class="tab-btn active" onclick="switchTab('basic')">Basic</button>
+                <button class="tab-btn" onclick="switchTab('functions')">Functions</button>
+            </div>
+            
+            <!-- Basic Tab -->
+            <div id="basic-tab" class="tab-content active">
+                <div class="button-grid">
+                    <!-- Numbers -->
+                    <button class="calc-btn" onclick="appendToInput('7')">7</button>
+                    <button class="calc-btn" onclick="appendToInput('8')">8</button>
+                    <button class="calc-btn" onclick="appendToInput('9')">9</button>
+                    <button class="calc-btn operator" onclick="appendToInput('/')">/</button>
+                    <button class="calc-btn function" onclick="appendToInput('sqrt(')">√</button>
+                    <button class="calc-btn function" onclick="appendToInput('pi')">π</button>
+                    
+                    <button class="calc-btn" onclick="appendToInput('4')">4</button>
+                    <button class="calc-btn" onclick="appendToInput('5')">5</button>
+                    <button class="calc-btn" onclick="appendToInput('6')">6</button>
+                    <button class="calc-btn operator" onclick="appendToInput('*')">×</button>
+                    <button class="calc-btn function" onclick="appendToInput('^2')">x²</button>
+                    <button class="calc-btn function" onclick="appendToInput('e')">e</button>
+                    
+                    <button class="calc-btn" onclick="appendToInput('1')">1</button>
+                    <button class="calc-btn" onclick="appendToInput('2')">2</button>
+                    <button class="calc-btn" onclick="appendToInput('3')">3</button>
+                    <button class="calc-btn operator" onclick="appendToInput('-')">-</button>
+                    <button class="calc-btn function" onclick="appendToInput('^')">x^y</button>
+                    <button class="calc-btn function" onclick="appendToInput('i')">i</button>
+                    
+                    <button class="calc-btn" onclick="appendToInput('0')">0</button>
+                    <button class="calc-btn" onclick="appendToInput('.')">.</button>
+                    <button class="calc-btn" onclick="appendToInput('(')">(</button>
+                    <button class="calc-btn" onclick="appendToInput(')')">)</button>
+                    <button class="calc-btn operator" onclick="appendToInput('+')">+</button>
+                    <button class="calc-btn function" onclick="appendToInput('phi')">φ</button>
+                </div>
+            </div>
+            
+            <!-- Functions Tab -->
+            <div id="functions-tab" class="tab-content">
+                <div class="button-grid">
+                    <!-- Trig functions (regular color) -->
+                    <button class="calc-btn trig" onclick="appendToInput('sin(')">sin</button>
+                    <button class="calc-btn trig" onclick="appendToInput('cos(')">cos</button>
+                    <button class="calc-btn trig" onclick="appendToInput('tan(')">tan</button>
+                    <button class="calc-btn trig" onclick="appendToInput('asin(')">asin</button>
+                    <button class="calc-btn trig" onclick="appendToInput('acos(')">acos</button>
+                    <button class="calc-btn trig" onclick="appendToInput('atan(')">atan</button>
+                    
+                    <!-- More trig functions -->
+                    <button class="calc-btn trig" onclick="appendToInput('sinh(')">sinh</button>
+                    <button class="calc-btn trig" onclick="appendToInput('cosh(')">cosh</button>
+                    <button class="calc-btn trig" onclick="appendToInput('tanh(')">tanh</button>
+                    <button class="calc-btn trig" onclick="toggleAngleMode()">DEG/RAD</button>
+                    
+                    <!-- Advanced functions (blue) -->
+                    <button class="calc-btn advanced" onclick="appendToInput('abs(')">abs</button>
+                    <button class="calc-btn advanced" onclick="appendToInput('log(')">log</button>
+                    <button class="calc-btn advanced" onclick="appendToInput('log10(')">log10</button>
+                    <button class="calc-btn advanced" onclick="appendToInput('exp(')">exp</button>
+                    <button class="calc-btn advanced" onclick="appendToInput('factorial(')">n!</button>
+                    
+                    <!-- More advanced functions -->
+                    <button class="calc-btn advanced" onclick="appendToInput('ceil(')">ceil</button>
+                    <button class="calc-btn advanced" onclick="appendToInput('floor(')">floor</button>
+                    <button class="calc-btn advanced" onclick="appendToInput('round(')">round</button>
+                    <button class="calc-btn advanced" onclick="appendToInput('mod(')">mod</button>
+                    <button class="calc-btn advanced" onclick="appendToInput('gcd(')">gcd</button>
+                    
+                    <!-- Matrix functions (green) -->
+                    <button class="calc-btn matrix" onclick="appendToInput('det(')">det</button>
+                    <button class="calc-btn matrix" onclick="appendToInput('inv(')">inv</button>
+                    <button class="calc-btn matrix" onclick="appendToInput('transpose(')">trans</button>
+                    <button class="calc-btn matrix" onclick="appendToInput('[')">[</button>
+                    <button class="calc-btn matrix" onclick="appendToInput(']')">]</button>
+                    <button class="calc-btn matrix" onclick="appendToInput(',')">,</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Section B: Notes -->
+        <div id="section-b" class="panel">
+            <h3>Notes</h3>
+            <textarea id="notes-area" placeholder="Write your calculation notes here..."></textarea>
+        </div>
+
+        <!-- Section D: Graph and Table (Hidden by default) -->
+        <div id="section-d">
+            <div class="graph-section panel">
+                <h3>Graph Section</h3>
+                <div class="graph-controls">
+                    <button onclick="toggleGraph()">Hide Graph</button>
+                    <button onclick="addEquation()">Add Equation</button>
+                    <button onclick="toggleTable()">Show Table</button>
+                    <button onclick="clearGraph()">Clear Graph</button>
+                </div>
+                
+                <div id="equations-list"></div>
+                
+                <div class="graph-inputs">
+                    <div>
+                        <div class="input-row">
+                            <label>X-Axis Label: <input type="text" id="x-label" value="x" onchange="updateGraph()"></label>
+                            <label>X Min: <input type="number" id="x-min" value="-10" onchange="updateGraph()"></label>
+                            <label>X Max: <input type="number" id="x-max" value="10" onchange="updateGraph()"></label>
+                        </div>
+                        <div class="tick-controls">
+                            <label><input type="checkbox" id="show-x-ticks" checked onchange="updateGraph()"> Show X Ticks</label>
+                            <label>X Tick Interval: <input type="number" id="x-tick-interval" value="2" step="0.5" onchange="updateGraph()"></label>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="input-row">
+                            <label>Y-Axis Label: <input type="text" id="y-label" value="y" onchange="updateGraph()"></label>
+                            <label>Y Min: <input type="number" id="y-min" value="-10" onchange="updateGraph()"></label>
+                            <label>Y Max: <input type="number" id="y-max" value="10" onchange="updateGraph()"></label>
+                        </div>
+                        <div class="tick-controls">
+                            <label><input type="checkbox" id="show-y-ticks" checked onchange="updateGraph()"> Show Y Ticks</label>
+                            <label>Y Tick Interval: <input type="number" id="y-tick-interval" value="2" step="0.5" onchange="updateGraph()"></label>
+                        </div>
+                    </div>
+                </div>
+                
+                <canvas id="graph-canvas"></canvas>
+            </div>
+            
+            <div id="table-section" class="table-section panel">
+                <h3>Value Table</h3>
+                <div class="table-controls">
+                    <label>X Start: <input type="number" id="table-x-start" value="0"></label>
+                    <label>X End: <input type="number" id="table-x-end" value="10"></label>
+                    <label>Step: <input type="number" id="table-x-step" value="1" step="0.1"></label>
+                    <button onclick="generateTable()">Generate Table</button>
+                    <button onclick="toggleTable()">Hide Table</button>
+                </div>
+                <div id="table-container"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Download/Upload Modal -->
+    <div id="download-modal" class="modal">
+        <div class="modal-content">
+            <h3>Save/Load Data</h3>
+            
+            <div class="checkbox-group">
+                <h4>Select what to save:</h4>
+                <label><input type="checkbox" id="save-variables" checked> Variables</label>
+                <label><input type="checkbox" id="save-notes" checked> Notes</label>
+                <label><input type="checkbox" id="save-history" checked> Calculation History</label>
+                <label><input type="checkbox" id="save-graph" checked> Graph Data</label>
+            </div>
+            
+            <div style="margin-top: 15px;">
+                <button onclick="downloadData()">Download Data</button>
+                <label for="file-upload" class="btn" style="display: inline-block;">
+                    Load Data
+                    <input type="file" id="file-upload" style="display: none;" onchange="loadData(event)" accept=".txt">
+                </label>
+                <button onclick="closeModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Application State
+        let currentInput = '';
+        let calculationHistory = [];
+        let variables = {};
+        let angleMode = 'deg'; // 'deg' or 'rad'
+        let graphEquations = [];
+        let graphVisible = false;
+        let tableVisible = false;
+        let tableHeaders = { x: 'x' }; // Store custom table headers
+        let isLoadingData = false;
+
+        // Initialize
+        window.onload = function() {
+            loadFromMemory();
+            updateDisplay();
+            setupCanvas();
+            
+            window.addEventListener('resize', () => {
+                if (graphVisible) {
+                    setupCanvas();
+                    updateGraph();
+                }
+            });
+        };
+
+        // Set up canvas for high resolution
+        function setupCanvas() {
+            const canvas = document.getElementById('graph-canvas');
+            const ctx = canvas.getContext('2d');
+            
+            // Get the actual rendered size from the parent container
+            const parent = canvas.parentElement;
+            const computedStyle = window.getComputedStyle(canvas);
+            const displayWidth = canvas.clientWidth || 800;
+            const displayHeight = 400;
+            
+            // Set canvas internal resolution to match display size
+            canvas.width = displayWidth;
+            canvas.height = displayHeight;
+            
+            // The CSS will handle the display size
+            canvas.style.height = '400px';
+        }
+
+        // Memory persistence functions
+        function saveToMemory() {
+            // Don't save while loading to prevent loops
+            if (isLoadingData) return;
+            
+            try {
+                const data = {
+                    variables: variables,
+                    notes: document.getElementById('notes-area').value,
+                    history: calculationHistory,
+                    equations: graphEquations,
+                    angleMode: angleMode,
+                    tableHeaders: tableHeaders
+                };
+                localStorage.setItem('calculatorData', JSON.stringify(data));
+            } catch (e) {
+                console.error('Error saving to memory:', e);
+            }
+        }
+
+        function loadFromMemory() {
+            try {
+                const savedData = localStorage.getItem('calculatorData');
+                if (savedData) {
+                    const data = JSON.parse(savedData);
+                    
+                    // Load all data without rendering
+                    if (data.variables) {
+                        variables = data.variables;
+                    }
+                    
+                    if (data.notes) {
+                        document.getElementById('notes-area').value = data.notes;
+                    }
+                    
+                    if (data.history) {
+                        calculationHistory = data.history;
+                        updateHistoryDisplay();
+                    }
+                    
+                    if (data.equations) {
+                        graphEquations = data.equations;
+                        renderEquationsList();
+                    }
+                    
+                    if (data.angleMode) {
+                        angleMode = data.angleMode;
+                    }
+                    
+                    if (data.tableHeaders) {
+                        tableHeaders = data.tableHeaders;
+                    }
+                    
+                    // Render variables WITHOUT evaluating them on load
+                    renderVariablesSimple();
+                }
+            } catch (e) {
+                console.log('No saved data found or error loading data:', e);
+            }
+        }
+
+        // Calculator Functions
+        function appendToInput(value) {
+            currentInput += value;
+            updateDisplay();
+            document.getElementById('direct-input').value = currentInput;
+        }
+
+        function clearDisplay() {
+            currentInput = '';
+            document.getElementById('current-result').textContent = '0';
+            document.getElementById('direct-input').value = '';
+            updateDisplay();
+        }
+
+        function clearHistory() {
+            calculationHistory = [];
+            updateHistoryDisplay();
+            saveToMemory();
+        }
+
+        function updateDisplay() {
+            document.getElementById('current-input').textContent = currentInput || '';
+        }
+
+        // Handle direct input from the text field
+        function handleDirectInput(event) {
+            if (event.key === 'Enter') {
+                currentInput = event.target.value;
+                calculate();
+            } else {
+                // Use setTimeout to get the value AFTER the keystroke is processed
+                setTimeout(() => {
+                    currentInput = event.target.value;
+                    updateDisplay();
+                }, 0);
+            }
+        }
+
+        // NEW APPROACH: Use math.js compile for better function handling
+        function evaluateExpression(expression) {
+            try {
+                // Preprocess the expression
+                let processedExpr = preprocessExpression(expression);
+                
+                // Handle degree conversion for trig functions
+                if (angleMode === 'deg') {
+                    processedExpr = convertToRadians(processedExpr);
+                }
+                
+                // Create a custom scope with variables
+                const scope = {
+                    pi: math.pi,
+                    e: math.e,
+                    i: math.i,
+                    phi: (1 + Math.sqrt(5)) / 2
+                };
+                
+                // Add user variables to scope
+                for (let varName in variables) {
+                    try {
+                        // Evaluate the variable first
+                        scope[varName] = evaluateExpression(variables[varName]);
+                    } catch (e) {
+                        scope[varName] = variables[varName];
+                    }
+                }
+                
+                // Use math.js compile for better function handling
+                const node = math.compile(processedExpr);
+                const result = node.evaluate(scope);
+                
+                return result;
+            } catch (error) {
+                throw error;
+            }
+        }
+
+        function preprocessExpression(expression) {
+            // List of known math.js functions
+            const knownFunctions = [
+                'factorial', 'sqrt', 'sin', 'cos', 'tan', 'asin', 'acos', 'atan',
+                'sinh', 'cosh', 'tanh', 'abs', 'log', 'log10', 'exp',
+                'ceil', 'floor', 'round', 'mod', 'gcd', 'det', 'inv', 'transpose',
+                'pi', 'e', 'phi', 'i'  // constants
+            ];
+            
+            // Also include user-defined variables
+            const userVariables = Object.keys(variables);
+            
+            let result = expression;
+            let position = 0;
+            let output = '';
+            
+            while (position < result.length) {
+                const char = result[position];
+                
+                // If it's a digit
+                if (/\d/.test(char)) {
+                    // Consume the entire number (including decimals)
+                    let number = '';
+                    while (position < result.length && /[\d.]/.test(result[position])) {
+                        number += result[position];
+                        position++;
+                    }
+                    output += number;
+                    
+                    // Check what comes after the number
+                    if (position < result.length) {
+                        const nextChar = result[position];
+                        // If next is letter or opening parenthesis, add multiplication
+                        if (/[a-zA-Z_(]/.test(nextChar)) {
+                            output += '*';
+                        }
+                    }
+                }
+                // If it's a letter or underscore (start of identifier)
+                else if (/[a-zA-Z_]/.test(char)) {
+                    // Consume the entire identifier
+                    let identifier = '';
+                    while (position < result.length && /[a-zA-Z_0-9]/.test(result[position])) {
+                        identifier += result[position];
+                        position++;
+                    }
+                    
+                    // Check if it's a known function or constant
+                    const isFunction = knownFunctions.includes(identifier);
+                    const isVariable = userVariables.includes(identifier);
+                    
+                    output += identifier;
+                    
+                    // Check what comes after
+                    if (position < result.length) {
+                        const nextChar = result[position];
+                        
+                        // If it's NOT a function and next is '(' or a letter/number, add multiplication
+                        if (!isFunction && /[a-zA-Z_0-9(]/.test(nextChar)) {
+                            output += '*';
+                        }
+                        // If it IS a variable followed by a digit or letter (not '('), add multiplication
+                        else if (isVariable && /[a-zA-Z_0-9]/.test(nextChar) && nextChar !== '(') {
+                            output += '*';
+                        }
+                    }
+                }
+                // If it's a closing parenthesis
+                else if (char === ')') {
+                    output += char;
+                    position++;
+                    
+                    // Check what comes after
+                    if (position < result.length) {
+                        const nextChar = result[position];
+                        // If next is opening parenthesis, letter, or digit, add multiplication
+                        if (/[a-zA-Z_0-9(]/.test(nextChar)) {
+                            output += '*';
+                        }
+                    }
+                }
+                // Any other character (operators, opening parenthesis, etc.)
+                else {
+                    output += char;
+                    position++;
+                }
+            }
+            
+            return output;
+        }
+
+        function convertToRadians(expression) {
+            // Convert trig function arguments from degrees to radians
+            return expression
+                .replace(/sin\(/g, 'sin(pi/180*')
+                .replace(/cos\(/g, 'cos(pi/180*')
+                .replace(/tan\(/g, 'tan(pi/180*')
+                .replace(/asin\(/g, '180/pi*asin(')
+                .replace(/acos\(/g, '180/pi*acos(')
+                .replace(/atan\(/g, '180/pi*atan(');
+        }
+
+        function calculate() {
+            if (!currentInput) return;
+            
+            try {
+                const result = evaluateExpression(currentInput);
+                
+                // Format result
+                let resultStr;
+                if (typeof result === 'number') {
+                    resultStr = math.format(result, {precision: 14});
+                } else {
+                    resultStr = math.format(result);
+                }
+                
+                // Add to history
+                calculationHistory.push({
+                    input: currentInput,
+                    result: resultStr
+                });
+                
+                // Update display
+                document.getElementById('current-result').textContent = resultStr;
+                
+                // Update history display
+                updateHistoryDisplay();
+                
+                saveToMemory();
+                
+            } catch (error) {
+                document.getElementById('current-result').textContent = 'Error: ' + error.message;
+            }
+        }
+
+        function updateHistoryDisplay() {
+            const historyDiv = document.getElementById('history');
+            const recentHistory = calculationHistory.slice(-5).reverse();
+            
+            historyDiv.innerHTML = recentHistory.map(item => 
+                `<div class="history-item">
+                    <span class="history-expression">${item.input}</span>
+                    <span class="history-result">${item.result}</span>
+                </div>`
+            ).join('');
+        }
+
+        function toggleAngleMode() {
+            angleMode = angleMode === 'deg' ? 'rad' : 'deg';
+            const angleBtn = document.querySelector('.calc-btn.trig[onclick="toggleAngleMode()"]');
+            angleBtn.textContent = angleMode === 'deg' ? 'DEG' : 'RAD';
+            saveToMemory();
+        }
+
+        // Tab switching
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            document.getElementById(tabName + '-tab').classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        // Variables Section
+        function addVariableFromInput() {
+            const input = document.getElementById('new-var-input').value.trim();
+            
+            if (!input) {
+                alert('Please enter a variable definition');
+                return;
+            }
+            
+            const parts = input.split('=');
+            if (parts.length !== 2) {
+                alert('Please use format: variable=expression');
+                return;
+            }
+            
+            const varName = parts[0].trim();
+            let varValue = parts[1].trim();
+            
+            // Validate the variable value by trying to evaluate it
+            try {
+                evaluateExpression(varValue);
+                variables[varName] = varValue;
+                renderVariables();
+                saveToMemory();
+                document.getElementById('new-var-input').value = '';
+            } catch (error) {
+                alert('Invalid expression: ' + error.message);
+            }
+        }
+
+        // New simplified render function for initial load
+        function renderVariablesSimple() {
+            const listDiv = document.getElementById('variables-list');
+            listDiv.innerHTML = '';
+            
+            for (let varName in variables) {
+                const varDiv = document.createElement('div');
+                varDiv.className = 'variable-item';
+                
+                varDiv.innerHTML = `
+                    <div class="variable-header">
+                        <span class="variable-name">${varName}</span>
+                        <button class="delete-variable" onclick="deleteVariable('${varName}')">×</button>
+                    </div>
+                    <input type="text" class="variable-input" value="${varName} = ${variables[varName]}" 
+                        onchange="updateVariableFromInput('${varName}', this.value)">
+                    <div class="variable-value">= <em>Click to evaluate</em></div>
+                `;
+                
+                listDiv.appendChild(varDiv);
+            }
+        }
+
+        // Update renderVariables to not call saveToMemory
+        function renderVariables() {
+            const listDiv = document.getElementById('variables-list');
+            listDiv.innerHTML = '';
+            
+            for (let varName in variables) {
+                const varDiv = document.createElement('div');
+                varDiv.className = 'variable-item';
+                
+                let computedValue = 'Not evaluated';
+                
+                try {
+                    const result = evaluateExpression(variables[varName]);
+                    computedValue = math.format(result, {precision: 14});
+                } catch (e) {
+                    computedValue = 'Error: ' + e.message;
+                }
+                
+                varDiv.innerHTML = `
+                    <div class="variable-header">
+                        <span class="variable-name">${varName}</span>
+                        <button class="delete-variable" onclick="deleteVariable('${varName}')">×</button>
+                    </div>
+                    <input type="text" class="variable-input" value="${varName} = ${variables[varName]}" 
+                        onchange="updateVariableFromInput('${varName}', this.value)">
+                    <div class="variable-value">= ${computedValue}</div>
+                `;
+                
+                listDiv.appendChild(varDiv);
+            }
+            // Don't call saveToMemory here
+        }
+
+
+        function updateVariableFromInput(oldName, newInput) {
+            const parts = newInput.split('=');
+            if (parts.length !== 2) {
+                alert('Please use format: variable=expression');
+                renderVariables();
+                return;
+            }
+            
+            const newName = parts[0].trim();
+            let newValue = parts[1].trim();
+            
+            // Validate the new value
+            try {
+                evaluateExpression(newValue);
+                
+                if (oldName !== newName) {
+                    delete variables[oldName];
+                }
+                
+                variables[newName] = newValue;
+                renderVariables();
+                saveToMemory();
+            } catch (error) {
+                alert('Invalid expression: ' + error.message);
+                renderVariables();
+            }
+        }
+
+        function deleteVariable(varName) {
+            delete variables[varName];
+            renderVariables();
+            saveToMemory();
+        }
+
+        function clearVariables() {
+            if (confirm('Clear all variables?')) {
+                variables = {};
+                renderVariables();
+                saveToMemory();
+            }
+        }
+
+        // Graph Functions
+        function toggleGraph() {
+            graphVisible = !graphVisible;
+            const graphSection = document.getElementById('section-d');
+            
+            if (graphVisible) {
+                graphSection.classList.add('visible');
+                if (graphEquations.length === 0) {
+                    const defaultEquation = 'x^2';
+                    const color = '#' + Math.floor(Math.random()*16777215).toString(16);
+                    graphEquations.push({ 
+                        equation: defaultEquation, 
+                        color, 
+                        visible: true,
+                        type: 'function'
+                    });
+                    renderEquationsList();
+                }
+                // Give the DOM time to render before setting up canvas
+                setTimeout(() => {
+                    setupCanvas();
+                    updateGraph();
+                }, 100);
+            } else {
+                graphSection.classList.remove('visible');
+            }
+        }
+
+        function toggleTable() {
+            tableVisible = !tableVisible;
+            const tableSection = document.getElementById('table-section');
+            
+            if (tableVisible) {
+                tableSection.classList.add('visible');
+                generateTable();
+                // Resize canvas after table becomes visible
+                setTimeout(() => {
+                    setupCanvas();
+                    updateGraph();
+                }, 100);
+            } else {
+                tableSection.classList.remove('visible');
+                // Resize canvas after table is hidden
+                setTimeout(() => {
+                    setupCanvas();
+                    updateGraph();
+                }, 100);
+            }
+        }
+
+        function addEquation() {
+            const equation = prompt('Enter equation (e.g., x^2, sin(x), etc.):');
+            if (equation) {
+                const color = '#' + Math.floor(Math.random()*16777215).toString(16);
+                graphEquations.push({ 
+                    equation, 
+                    color, 
+                    visible: true,
+                    type: 'function'
+                });
+                renderEquationsList();
+                updateGraph();
+            }
+        }
+
+        function renderEquationsList() {
+            const listDiv = document.getElementById('equations-list');
+            listDiv.innerHTML = '';
+            
+            graphEquations.forEach((eq, index) => {
+                const eqDiv = document.createElement('div');
+                eqDiv.className = 'equation-item';
+                
+                eqDiv.innerHTML = `
+                    <input type="color" class="color-picker" value="${eq.color}" onchange="updateEquationColor(${index}, this.value)">
+                    <input type="text" value="${eq.equation}" onchange="updateEquationText(${index}, this.value)" style="flex: 1;">
+                    <select class="equation-type" onchange="updateEquationType(${index}, this.value)">
+                        <option value="function" ${eq.type === 'function' ? 'selected' : ''}>Function</option>
+                        <option value="point" ${eq.type === 'point' ? 'selected' : ''}>Point</option>
+                        <option value="inequality" ${eq.type === 'inequality' ? 'selected' : ''}>Inequality</option>
+                    </select>
+                    <input type="checkbox" ${eq.visible ? 'checked' : ''} onchange="toggleEquationVisibility(${index}, this.checked)">
+                    <button onclick="removeEquation(${index})">×</button>
+                `;
+                
+                listDiv.appendChild(eqDiv);
+            });
+        }
+
+        function updateEquationColor(index, color) {
+            graphEquations[index].color = color;
+            updateGraph();
+        }
+
+        function updateEquationText(index, text) {
+            graphEquations[index].equation = text;
+            updateGraph();
+        }
+
+        function updateEquationType(index, type) {
+            graphEquations[index].type = type;
+            updateGraph();
+        }
+
+        function toggleEquationVisibility(index, visible) {
+            graphEquations[index].visible = visible;
+            updateGraph();
+        }
+
+        function removeEquation(index) {
+            graphEquations.splice(index, 1);
+            renderEquationsList();
+            updateGraph();
+        }
+
+        function clearGraph() {
+            if (confirm('Clear all equations?')) {
+                graphEquations = [];
+                renderEquationsList();
+                updateGraph();
+            }
+        }
+
+        function updateGraph() {
+            const canvas = document.getElementById('graph-canvas');
+            const ctx = canvas.getContext('2d');
+            
+            // Make sure canvas is properly sized
+            if (canvas.width === 0 || canvas.height === 0) {
+                setupCanvas();
+            }
+            
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Get graph parameters
+            const xMin = parseFloat(document.getElementById('x-min').value);
+            const xMax = parseFloat(document.getElementById('x-max').value);
+            const yMin = parseFloat(document.getElementById('y-min').value);
+            const yMax = parseFloat(document.getElementById('y-max').value);
+            const xLabel = document.getElementById('x-label').value;
+            const yLabel = document.getElementById('y-label').value;
+            const showXTicks = document.getElementById('show-x-ticks').checked;
+            const showYTicks = document.getElementById('show-y-ticks').checked;
+            const xTickInterval = parseFloat(document.getElementById('x-tick-interval').value);
+            const yTickInterval = parseFloat(document.getElementById('y-tick-interval').value);
+            
+            // Use actual canvas dimensions
+            const width = canvas.width;
+            const height = canvas.height;
+            
+            // Coordinate transformation functions
+            function xToCanvas(x) {
+                return ((x - xMin) / (xMax - xMin)) * width;
+            }
+            
+            function yToCanvas(y) {
+                return height - ((y - yMin) / (yMax - yMin)) * height;
+            }
+            
+            // Draw grid and axes
+            ctx.strokeStyle = '#ccc';
+            ctx.lineWidth = 1;
+            
+            // Vertical grid lines
+            if (showXTicks) {
+                for (let x = Math.ceil(xMin / xTickInterval) * xTickInterval; x <= xMax; x += xTickInterval) {
+                    const canvasX = xToCanvas(x);
+                    ctx.beginPath();
+                    ctx.moveTo(canvasX, 0);
+                    ctx.lineTo(canvasX, height);
+                    ctx.stroke();
+                }
+            }
+            
+            // Horizontal grid lines
+            if (showYTicks) {
+                for (let y = Math.ceil(yMin / yTickInterval) * yTickInterval; y <= yMax; y += yTickInterval) {
+                    const canvasY = yToCanvas(y);
+                    ctx.beginPath();
+                    ctx.moveTo(0, canvasY);
+                    ctx.lineTo(width, canvasY);
+                    ctx.stroke();
+                }
+            }
+            
+            // Draw axes with ticks
+            ctx.strokeStyle = '#000';
+            ctx.lineWidth = 2;
+            
+            // X-axis
+            const xAxisY = yToCanvas(0);
+            ctx.beginPath();
+            ctx.moveTo(0, xAxisY);
+            ctx.lineTo(width, xAxisY);
+            ctx.stroke();
+            
+            // Y-axis
+            const yAxisX = xToCanvas(0);
+            ctx.beginPath();
+            ctx.moveTo(yAxisX, 0);
+            ctx.lineTo(yAxisX, height);
+            ctx.stroke();
+            
+            // Draw axis ticks and labels
+            ctx.fillStyle = '#000';
+            ctx.font = '12px Arial';
+            
+            // X-axis ticks and labels
+            if (showXTicks) {
+                for (let x = Math.ceil(xMin / xTickInterval) * xTickInterval; x <= xMax; x += xTickInterval) {
+                    const canvasX = xToCanvas(x);
+                    
+                    // Draw tick mark
+                    ctx.beginPath();
+                    ctx.moveTo(canvasX, xAxisY - 5);
+                    ctx.lineTo(canvasX, xAxisY + 5);
+                    ctx.stroke();
+                    
+                    // Draw label
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'top';
+                    ctx.fillText(x.toFixed(1), canvasX, xAxisY + 8);
+                }
+            }
+            
+            // Y-axis ticks and labels
+            if (showYTicks) {
+                for (let y = Math.ceil(yMin / yTickInterval) * yTickInterval; y <= yMax; y += yTickInterval) {
+                    const canvasY = yToCanvas(y);
+                    
+                    // Draw tick mark
+                    ctx.beginPath();
+                    ctx.moveTo(yAxisX - 5, canvasY);
+                    ctx.lineTo(yAxisX + 5, canvasY);
+                    ctx.stroke();
+                    
+                    // Draw label
+                    ctx.textAlign = 'right';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(y.toFixed(1), yAxisX - 8, canvasY);
+                }
+            }
+            
+            // Draw axis labels
+            ctx.fillStyle = '#000';
+            ctx.font = '14px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+            ctx.fillText(xLabel, width / 2, xAxisY + 25);
+            
+            ctx.save();
+            ctx.translate(15, height / 2);
+            ctx.rotate(-Math.PI / 2);
+            ctx.textAlign = 'center';
+            ctx.fillText(yLabel, 0, 0);
+            ctx.restore();
+            
+            // Plot equations using the new evaluation method
+            graphEquations.forEach(eq => {
+                if (!eq.visible) return;
+                
+                ctx.strokeStyle = eq.color;
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                
+                let pointsPlotted = 0;
+                
+                for (let i = 0; i < width; i++) {
+                    const x = xMin + (i / width) * (xMax - xMin);
+                    
+                    try {
+                        // Replace 'x' in the equation with the current x value
+                        let expression = eq.equation.replace(/x/g, `(${x})`);
+                        const y = evaluateExpression(expression);
+                        
+                        if (typeof y === 'number' && isFinite(y)) {
+                            const canvasY = yToCanvas(y);
+                            
+                            if (pointsPlotted === 0) {
+                                ctx.moveTo(i, canvasY);
+                            } else {
+                                ctx.lineTo(i, canvasY);
+                            }
+                            pointsPlotted++;
+                        } else {
+                            if (pointsPlotted > 1) {
+                                ctx.stroke();
+                            }
+                            ctx.beginPath();
+                            pointsPlotted = 0;
+                        }
+                    } catch (error) {
+                        if (pointsPlotted > 1) {
+                            ctx.stroke();
+                        }
+                        ctx.beginPath();
+                        pointsPlotted = 0;
+                    }
+                }
+                
+                if (pointsPlotted > 1) {
+                    ctx.stroke();
+                }
+            });
+        }
+
+        
+        // Table Functions
+        function generateTable() {
+            const xStart = parseFloat(document.getElementById('table-x-start').value);
+            const xEnd = parseFloat(document.getElementById('table-x-end').value);
+            const step = parseFloat(document.getElementById('table-x-step').value);
+            
+            const tableContainer = document.getElementById('table-container');
+            
+            if (graphEquations.length === 0) {
+                tableContainer.innerHTML = '<p>No equations to tabulate</p>';
+                return;
+            }
+            
+            let tableHTML = '<table id="value-table"><thead><tr>';
+            
+            // Create headers
+            tableHTML += `<th class="editable" onclick="editHeader('x')">${tableHeaders.x}</th>`;
+            
+            graphEquations.forEach((eq, index) => {
+                const headerName = tableHeaders[`eq${index}`] || `y${index + 1}`;
+                tableHTML += `<th class="editable" onclick="editHeader('eq${index}')">${headerName}</th>`;
+            });
+            
+            tableHTML += '</tr></thead><tbody>';
+            
+            // Generate table rows
+            for (let x = xStart; x <= xEnd; x += step) {
+                tableHTML += '<tr>';
+                tableHTML += `<td>${x.toFixed(2)}</td>`;
+                
+                graphEquations.forEach(eq => {
+                    try {
+                        let expression = eq.equation.replace(/x/g, `(${x})`);
+                        const y = evaluateExpression(expression);
+                        tableHTML += `<td>${typeof y === 'number' ? y.toFixed(4) : 'N/A'}</td>`;
+                    } catch (error) {
+                        tableHTML += '<td>Error</td>';
+                    }
+                });
+                
+                tableHTML += '</tr>';
+            }
+            
+            tableHTML += '</tbody></table>';
+            tableContainer.innerHTML = tableHTML;
+        }
+
+        function editHeader(headerKey) {
+            const currentName = tableHeaders[headerKey] || (headerKey === 'x' ? 'x' : headerKey);
+            const newName = prompt('Enter new header name:', currentName);
+            
+            if (newName && newName.trim() !== '') {
+                tableHeaders[headerKey] = newName.trim();
+                generateTable();
+            }
+        }
+
+        // Download/Upload Functions
+        function showDownloadModal() {
+            document.getElementById('download-modal').classList.add('visible');
+        }
+
+        function closeModal() {
+            document.getElementById('download-modal').classList.remove('visible');
+        }
+
+        function downloadData() {
+            const data = {
+                variables: variables,
+                notes: document.getElementById('notes-area').value,
+                history: calculationHistory,
+                equations: graphEquations,
+                angleMode: angleMode,
+                tableHeaders: tableHeaders,
+                timestamp: new Date().toISOString()
+            };
+            
+            const dataStr = JSON.stringify(data, null, 2);
+            const dataBlob = new Blob([dataStr], {type: 'text/plain'});
+            
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(dataBlob);
+            link.download = 'calculator_data.txt';
+            link.click();
+        }
+        
+
+        function loadData(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            // Prevent multiple simultaneous loads
+            if (isLoadingData) return;
+            isLoadingData = true;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    
+                    // Close modal first
+                    closeModal();
+                    
+                    // Reset the file input
+                    event.target.value = '';
+                    
+                    // Load data
+                    if (data.variables) {
+                        variables = data.variables;
+                    }
+                    
+                    if (data.notes !== undefined) {
+                        document.getElementById('notes-area').value = data.notes;
+                    }
+                    
+                    if (data.history) {
+                        calculationHistory = data.history;
+                    }
+                    
+                    if (data.equations) {
+                        graphEquations = data.equations;
+                    }
+                    
+                    if (data.angleMode) {
+                        angleMode = data.angleMode;
+                    }
+                    
+                    if (data.tableHeaders) {
+                        tableHeaders = data.tableHeaders;
+                    }
+                    
+                    // Save to memory
+                    saveToMemory();
+                    
+                    // Now render everything AFTER all data is loaded
+                    setTimeout(() => {
+                        renderVariables();
+                        updateHistoryDisplay();
+                        renderEquationsList();
+                        if (graphVisible) {
+                            updateGraph();
+                        }
+                        isLoadingData = false;
+                    }, 50);
+                    
+                } catch (error) {
+                    console.error('Load error:', error);
+                    closeModal();
+                    event.target.value = '';
+                    isLoadingData = false;
+                }
+            };
+            
+            reader.onerror = function(error) {
+                console.error('File read error:', error);
+                closeModal();
+                event.target.value = '';
+                isLoadingData = false;
+            };
+            
+            reader.readAsText(file);
+        }
+    </script>
+</body>
+</html>
